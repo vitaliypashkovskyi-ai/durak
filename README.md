@@ -8,7 +8,14 @@ python -m http.server 8137 --directory D:/Durak
 ```
 Відкрити http://localhost:8137
 
-## Як підключити до Telegram
+Гра онлайн: https://vitaliypashkovskyi-ai.github.io/durak/
+
+## Бот на QNAP
+Папка `bot/` → на NAS у `/share/Pashkovskyi/durak-bot`. У `.env` вписати `BOT_TOKEN`,
+потім Container Station → Applications → Create → вставити `bot/docker-compose.yml`.
+Бот сам ставить кнопку меню «Грати» і команди /start, /play, /rules.
+
+## Як підключити до Telegram вручну
 1. Викласти `index.html` на будь-який хостинг з **HTTPS**
    (GitHub Pages, Netlify, Cloudflare Pages або свій сервер з SSL).
 2. У Telegram відкрити **@BotFather**:

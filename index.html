@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Дурень</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --felt:#21603e; --felt2:#143a27; --ink:#fff; --muted:rgba(255,255,255,.72);
+  --card:#fffdf7; --red:#c62828; --black:#1b1b1b; --gold:#f5c542; --blue:#2f6fd6;
+  --cw:min(64px,15.5vw);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;background:var(--felt2);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;background:radial-gradient(ellipse at 50% 45%,var(--felt) 0%,var(--felt2) 80%);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{display:flex;align-items:center;gap:8px;padding:10px 14px 4px}
+header h1{font-size:18px;margin:0;flex:1;letter-spacing:.5px}
+header h1 span{color:var(--gold)}
+.stat{font-size:13px;color:var(--muted)}
+.hbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:7px 10px;font-size:14px;cursor:pointer}
+#botArea{display:flex;flex-direction:column;align-items:center;padding:4px 12px 0}
+#botLabel{font-size:12px;color:var(--muted);margin-bottom:4px}
+#botHand{display:flex;justify-content:center;width:100%;min-height:calc(var(--cw)*.62*1.42)}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0;padding:0 12px}
+#info{display:flex;align-items:center;gap:14px;align-self:stretch;justify-content:center}
+#deck{--cw:calc(min(64px,15.5vw)*.8);position:relative;width:calc(var(--cw)*1.7);height:calc(var(--cw)*1.42)}
+#deck .card{position:absolute;left:0;top:0}
+#deck .trump{left:calc(var(--cw)*.42);top:calc(var(--cw)*.12);transform:rotate(90deg)}
+#deck .empty{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--cw)*.7);opacity:.35}
+#infoText{font-size:13px;color:var(--muted);line-height:1.5}
+#infoText b{color:#fff}
+#table{display:grid;grid-template-columns:repeat(3,calc(var(--cw)*1.4));gap:10px 8px;justify-content:center;align-content:center;min-height:calc(var(--cw)*1.42*1.25*2 + 10px)}
+.slot{position:relative;height:calc(var(--cw)*1.42*1.25)}
+.slot .card{position:absolute;left:0;top:0}
+.slot .card.d{left:calc(var(--cw)*.36);top:calc(var(--cw)*.3)}
+.slot .card.target{box-shadow:0 0 0 3px var(--gold),0 2px 6px rgba(0,0,0,.35)}
+.slot .card.tap{cursor:pointer}
+#status{text-align:center;font-size:14px;min-height:20px;padding:2px 12px;color:#fff}
+#btnRow{display:flex;justify-content:center;min-height:44px;padding:4px}
+#act{border:0;border-radius:12px;padding:10px 28px;font-size:16px;font-weight:600;color:#fff;background:var(--blue);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+#act.take{background:#c0392b}
+#act[hidden]{display:none}
+#hand{display:flex;justify-content:center;padding:14px 12px 18px;min-height:calc(var(--cw)*1.42 + 32px)}
+
+.card{width:var(--cw);height:calc(var(--cw)*1.42);border-radius:calc(var(--cw)*.12);background:var(--card);color:var(--black);position:relative;box-shadow:0 2px 6px rgba(0,0,0,.35);flex:none;transition:transform .15s,filter .15s,margin .15s}
+.card.red{color:var(--red)}
+.card .c{position:absolute;left:7%;top:4%;font-weight:700;line-height:.95;font-size:calc(var(--cw)*.27);text-align:center}
+.card .c i{display:block;font-style:normal;font-size:calc(var(--cw)*.25)}
+.card .m{position:absolute;inset:0;display:grid;place-items:center;font-size:calc(var(--cw)*.55);padding-top:22%;padding-left:18%}
+.card.tr::after{content:"";position:absolute;right:6%;top:6%;width:7px;height:7px;border-radius:50%;background:var(--gold)}
+.back{background:
+  repeating-linear-gradient(45deg,transparent 0 6px,#b3201f 6px 8px),
+  repeating-linear-gradient(-45deg,transparent 0 6px,#1b1b1b 6px 8px),#fffdf7;
+  box-shadow:inset 0 0 0 3px #fffdf7,inset 0 0 0 5px #b3201f,0 2px 6px rgba(0,0,0,.35)}
+.mini{--cw:calc(min(64px,15.5vw)*.62)}
+#hand .card{cursor:pointer}
+#hand .card.ok{transform:translateY(-10px)}
+#hand .card.dim{filter:brightness(.62)}
+.pop{animation:pop .22s ease-out}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+#toast{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.9);background:rgba(0,0,0,.72);padding:10px 20px;border-radius:12px;font-size:18px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+#toast.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px;z-index:10}
+.overlay[hidden]{display:none}
+.panel{background:#fffdf7;color:#1b1b1b;border-radius:18px;padding:22px 20px;max-width:340px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.panel h2{margin:0 0 8px;font-size:24px}
+.panel p{margin:6px 0;font-size:14px;line-height:1.45;text-align:left}
+.panel .big{font-size:48px;margin:4px 0}
+.panel button{margin-top:14px;border:0;border-radius:12px;padding:11px 26px;font-size:16px;font-weight:600;background:var(--blue);color:#fff;cursor:pointer}
+.stripe{height:6px;border-radius:3px;background:linear-gradient(90deg,#0057b7 50%,#ffd700 50%);margin:12px 0 4px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Дурень <span>♦</span></h1>
+    <span class="stat" id="stats"></span>
+    <button class="hbtn" id="rulesBtn" aria-label="Правила">?</button>
+    <button class="hbtn" id="newBtn">Нова гра</button>
+  </header>
+  <div id="botArea">
+    <div id="botLabel"></div>
+    <div id="botHand" class="mini"></div>
+  </div>
+  <main>
+    <div id="info"><div id="deck"></div><div id="infoText"></div></div>
+    <div id="table"></div>
+  </main>
+  <div id="status"></div>
+  <div id="btnRow"><button id="act" hidden></button></div>
+  <div id="hand"></div>
+</div>
+<div id="toast"></div>
+<div class="overlay" id="over" hidden><div class="panel">
+  <div class="big" id="overIcon"></div><h2 id="overTitle"></h2>
+  <div class="stripe"></div>
+  <button id="againBtn">Ще раз</button>
+</div></div>
+<div class="overlay" id="rules" hidden><div class="panel">
+  <h2>Підкидний дурень</h2>
+  <p>36 карт, по 6 у руці. Козир — нижня карта колоди, будь-який козир б'є некозирну карту.</p>
+  <p><b>Атака:</b> киньте будь-яку карту. Далі можна підкидати карти того ж номіналу, що вже є на столі (не більше 6 і не більше, ніж карт у суперника).</p>
+  <p><b>Захист:</b> бийте старшою картою тієї ж масті або козирем. Не можете — «Беру».</p>
+  <p>Відбився — карти йдуть у «бито», і ходить той, хто захищався. Хто першим скинув усі карти після кінця колоди — виграв. Хто лишився з картами — дурень.</p>
+  <p style="text-align:center;color:#666">Порада: торкніться карти на столі, щоб вибрати, яку саме бити.</p>
+  <button id="rulesClose">Зрозуміло</button>
+</div></div>
+
+<script>
+// ---------- Telegram ----------
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }
+function haptic(kind) {
+  try {
+    if (!tg || !tg.HapticFeedback) return;
+    if (kind === 'error' || kind === 'success') tg.HapticFeedback.notificationOccurred(kind);
+    else tg.HapticFeedback.impactOccurred(kind || 'light');
+  } catch (e) {}
+}
+
+// ---------- Model ----------
+const SUITS = ['♠', '♣', '♥', '♦'];
+const RANKS = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
+const DELAY = { v: 650 };   // bot pace, ms (0 = instant, used by tests)
+let AUTO = false;           // when true, the AI also plays for the human (tests)
+let S = null;
+const seen = new Set();
+
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const val = c => c.r + (c.s === S.trump ? 10 : 0);
+const byVal = (a, b) => val(a) - val(b);
+const beats = (a, d) => (d.s === a.s && d.r > a.r) || (d.s === S.trump && a.s !== S.trump);
+const defender = () => 1 - S.attacker;
+const undefended = () => S.table.filter(p => !p.d).length;
+const remove = (hand, c) => hand.splice(hand.indexOf(c), 1);
+
+function canAdd(c) {
+  if (!S.table.length) return true;
+  if (S.table.length >= 6) return false;
+  if (undefended() >= S.hands[defender()].length) return false;
+  return S.table.some(p => p.a.r === c.r || (p.d && p.d.r === c.r));
+}
+// Whose move it is now
+function actor() {
+  if (!S.table.length || S.taking) return S.attacker;
+  return undefended() ? defender() : S.attacker;
+}
+function sortHand(h) { h.sort((a, b) => (a.s === S.trump) - (b.s === S.trump) || a.s - b.s || a.r - b.r); }
+function drawUp(p) { while (S.hands[p].length < 6 && S.deck.length) S.hands[p].push(S.deck.pop()); }
+
+function newGame() {
+  const deck = [];
+  for (let s = 0; s < 4; s++) for (let r = 0; r < 9; r++) deck.push({ s, r, id: s * 9 + r });
+  shuffle(deck);
+  const trumpCard = deck[0]; // bottom card, drawn last
+  S = { deck, trump: trumpCard.s, trumpCard, hands: [[], []], table: [], attacker: 0, taking: false, sel: null, over: false, busy: false, out: 0, gen: (S ? S.gen + 1 : 1) };
+  drawUp(0); drawUp(1);
+  const low = h => Math.min(99, ...h.filter(c => c.s === S.trump).map(c => c.r));
+  const l0 = low(S.hands[0]), l1 = low(S.hands[1]);
+  S.attacker = l0 === l1 ? (Math.random() < .5 ? 0 : 1) : (l0 < l1 ? 0 : 1);
+  sortHand(S.hands[0]);
+  seen.clear();
+  document.getElementById('over').hidden = true;
+  render();
+  toast(S.attacker === 0 ? 'Ви ходите першим' : 'Бот ходить першим');
+  tick();
+}
+
+function play(p, c) {           // attack / throw in
+  remove(S.hands[p], c);
+  S.table.push({ a: c, d: null });
+  if (p === 0) haptic('light');
+}
+function cover(p, i, c) {       // defend table[i] with c
+  remove(S.hands[p], c);
+  S.table[i].d = c;
+  if (p === 0) haptic('light');
+}
+
+function finish() {
+  const att = S.attacker, def = 1 - att, took = S.taking;
+  const cards = S.table.flatMap(p => p.d ? [p.a, p.d] : [p.a]);
+  if (took) S.hands[def].push(...cards); else S.out += cards.length;
+  toast(took ? (def === 0 ? 'Ви взяли' : 'Бот взяв') : 'Бито');
+  S.table = []; S.taking = false; S.sel = null; seen.clear();
+  drawUp(att); drawUp(def);
+  if (!took) S.attacker = def;
+  sortHand(S.hands[0]);
+  const total = S.deck.length + S.hands[0].length + S.hands[1].length + S.out;
+  if (total !== 36) console.error('Card count broken:', total);
+  if (checkOver()) { render(); return; }
+  render(); tick();
+}
+
+function checkOver() {
+  if (S.deck.length) return false;
+  const e0 = !S.hands[0].length, e1 = !S.hands[1].length;
+  if (!e0 && !e1) return false;
+  S.over = true;
+  S.result = e0 && e1 ? 'draw' : e0 ? 'win' : 'lose';
+  if (!AUTO) {
+    stats[S.result]++; saveStats();
+    haptic(S.result === 'lose' ? 'error' : 'success');
+    setTimeout(showOver, 500);
+  }
+  return true;
+}
+
+// ---------- Flow ----------
+function later(fn) {
+  const gen = S.gen;
+  if (DELAY.v === 0) return fn();
+  S.busy = true;
+  setTimeout(() => { if (S.gen !== gen) return; S.busy = false; fn(); }, DELAY.v);
+}
+function tick() {
+  if (S.over) return;
+  const a = actor();
+  // Attacker has nothing left to throw in -> close the bout automatically
+  if (S.table.length && a === S.attacker && !S.hands[a].some(canAdd)) return later(finish);
+  if (a === 1 || AUTO) later(() => aiStep(a));
+}
+
+// ---------- AI ----------
+function planDefense(p) {
+  const hand = [...S.hands[p]], plan = [];
+  const targets = S.table.map((x, i) => ({ x, i })).filter(t => !t.x.d).sort((u, v) => val(v.x.a) - val(u.x.a));
+  for (const { x, i } of targets) {
+    const opts = hand.filter(c => beats(x.a, c)).sort(byVal);
+    if (!opts.length) return null;
+    remove(hand, opts[0]); plan.push({ i, c: opts[0] });
+  }
+  return plan;
+}
+function chooseAdd(p) {
+  return S.hands[p].filter(canAdd)
+    .filter(c => !S.deck.length || (c.s !== S.trump && c.r <= 6))
+    .sort(byVal)[0];
+}
+function aiStep(p) {
+  if (S.over || actor() !== p) return;
+  const hand = S.hands[p];
+  if (!S.table.length) {
+    play(p, [...hand].sort(byVal)[0]);
+  } else if (defender() === p && !S.taking) {
+    const plan = planDefense(p);
+    const costly = plan && S.deck.length > 8 &&
+      plan.some(m => m.c.s === S.trump && S.table[m.i].a.s !== S.trump && m.c.r >= 7);
+    if (!plan || costly) { S.taking = true; if (p === 1) toast('Бот бере'); }
+    else cover(p, plan[0].i, plan[0].c);
+  } else {
+    const c = chooseAdd(p);
+    if (!c) return finish();
+    play(p, c);
+  }
+  render(); tick();
+}
+
+// ---------- Human input ----------
+function humanCanAct() { return S && !S.over && !S.busy && !AUTO && actor() === 0; }
+function humanDefending() { return defender() === 0 && !S.taking && undefended() > 0; }
+function playable(c) {
+  if (!humanCanAct()) return false;
+  if (humanDefending()) return S.table.some(p => !p.d && beats(p.a, c));
+  return canAdd(c);
+}
+function onHandTap(c, el) {
+  if (!humanCanAct()) return;
+  if (humanDefending()) {
+    let i = -1;
+    if (S.sel != null && S.table[S.sel] && !S.table[S.sel].d && beats(S.table[S.sel].a, c)) i = S.sel;
+    else i = S.table.findIndex(p => !p.d && beats(p.a, c));
+    if (i < 0) return reject(el);
+    cover(0, i, c);
+  } else {
+    if (!canAdd(c)) return reject(el);
+    play(0, c);
+  }
+  S.sel = null;
+  render(); tick();
+}
+function reject(el) { haptic('error'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function btnMode() {
+  if (!humanCanAct() || !S.table.length) return null;
+  if (defender() === 0) return 'take';
+  return S.taking ? 'give' : 'bito';
+}
+document.getElementById('act').onclick = () => {
+  const m = btnMode();
+  if (!m) return;
+  if (m === 'take') { S.taking = true; S.sel = null; haptic('medium'); render(); tick(); }
+  else finish();
+};
+
+// ---------- View ----------
+const $ = id => document.getElementById(id);
+function cardEl(c, extra) {
+  const d = document.createElement('div');
+  d.className = 'card' + (c.s >= 2 ? ' red' : '') + (c.s === S.trump ? ' tr' : '') + (extra ? ' ' + extra : '');
+  d.innerHTML = `<span class="c">${RANKS[c.r]}<i>${SUITS[c.s]}</i></span><span class="m">${SUITS[c.s]}</span>`;
+  return d;
+}
+function backEl() { const d = document.createElement('div'); d.className = 'card back'; return d; }
+function popIfNew(el, c) { if (!seen.has(c.id)) { seen.add(c.id); el.classList.add('pop'); } }
+
+function statusText() {
+  if (S.over) return S.result === 'win' ? 'Ви виграли!' : S.result === 'lose' ? 'Ви — дурень 🙃' : 'Нічия';
+  const a = actor();
+  if (a === 1) {
+    if (S.taking && defender() === 0) return 'Ви берете. Бот підкидає…';
+    return 'Бот думає…';
+  }
+  if (!S.table.length) return 'Ваш хід — киньте карту';
+  if (humanDefending()) return undefended() > 1 ? 'Відбивайтесь (торкніться карти на столі, щоб вибрати ціль)' : 'Відбивайтесь або беріть';
+  if (S.taking) return 'Бот бере. Підкиньте ще або «Віддати»';
+  return 'Бот відбився. Підкиньте або «Бито»';
+}
+
+function render() {
+  // bot
+  const bh = $('botHand'); bh.innerHTML = '';
+  S.hands[1].forEach(() => bh.appendChild(backEl()));
+  $('botLabel').textContent = `Бот · ${S.hands[1].length} карт`;
+  // deck
+  const dk = $('deck'); dk.innerHTML = '';
+  if (S.deck.length) {
+    dk.appendChild(cardEl(S.trumpCard, 'trump'));
+    if (S.deck.length > 1) dk.appendChild(backEl());
+  } else {
+    const e = document.createElement('div'); e.className = 'empty'; e.textContent = SUITS[S.trump];
+    e.style.color = S.trump >= 2 ? '#ff8a80' : '#fff'; dk.appendChild(e);
+  }
+  $('infoText').innerHTML = `Колода: <b>${S.deck.length}</b><br>Козир: <b style="color:${S.trump >= 2 ? '#ff8a80' : '#fff'}">${SUITS[S.trump]}</b> · Бито: <b>${S.out}</b>`;
+  // table
+  const tb = $('table'); tb.innerHTML = '';
+  const canTarget = humanCanAct() && humanDefending() && undefended() > 1;
+  S.table.forEach((p, i) => {
+    const slot = document.createElement('div'); slot.className = 'slot';
+    const a = cardEl(p.a); popIfNew(a, p.a);
+    if (!p.d && canTarget) {
+      a.classList.add('tap');
+      if (S.sel === i) a.classList.add('target');
+      a.onclick = () => { S.sel = S.sel === i ? null : i; render(); };
+    }
+    slot.appendChild(a);
+    if (p.d) { const d = cardEl(p.d, 'd'); popIfNew(d, p.d); slot.appendChild(d); }
+    tb.appendChild(slot);
+  });
+  // hand
+  const hd = $('hand'); hd.innerHTML = '';
+  const active = humanCanAct() && !(S.table.length && !humanDefending() && !S.hands[0].some(canAdd));
+  S.hands[0].forEach(c => {
+    const ok = playable(c);
+    const el = cardEl(c, active ? (ok ? 'ok' : 'dim') : '');
+    el.onclick = () => onHandTap(c, el);
+    hd.appendChild(el);
+  });
+  // controls
+  const m = btnMode(), act = $('act');
+  act.hidden = !m;
+  act.className = m === 'take' ? 'take' : '';
+  act.textContent = m === 'take' ? 'Беру' : m === 'give' ? 'Віддати' : 'Бито';
+  $('status').textContent = statusText();
+  $('stats').textContent = `🏆 ${stats.win} · 🙃 ${stats.lose}`;
+  layoutRow(hd, 6); layoutRow(bh, 3);
+}
+function layoutRow(row, gap) {
+  const cards = [...row.children]; if (!cards.length) return;
+  const cs = getComputedStyle(row);
+  const W = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const cw = cards[0].offsetWidth, n = cards.length;
+  const step = n > 1 ? Math.min(cw + gap, (W - cw) / (n - 1)) : 0;
+  cards.forEach((c, i) => c.style.marginLeft = i ? (step - cw) + 'px' : '0');
+}
+window.addEventListener('resize', () => S && render());
+
+let toastT;
+function toast(t) {
+  if (AUTO) return;
+  const el = $('toast'); el.textContent = t; el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1100);
+}
+function showOver() {
+  const r = S.result;
+  $('overIcon').textContent = r === 'win' ? '🏆' : r === 'lose' ? '🙃' : '🤝';
+  $('overTitle').textContent = r === 'win' ? 'Перемога!' : r === 'lose' ? 'Ви — дурень' : 'Нічия';
+  $('over').hidden = false;
+}
+
+// ---------- Stats ----------
+function loadStats() {
+  try { const s = JSON.parse(localStorage.getItem('durak.stats')); if (s && 'win' in s) return s; } catch (e) {}
+  return { win: 0, lose: 0, draw: 0 };
+}
+function saveStats() { try { localStorage.setItem('durak.stats', JSON.stringify(stats)); } catch (e) {} }
+const stats = loadStats();
+
+// ---------- Test hook: AI vs AI ----------
+window.simulate = function (n) {
+  const prev = DELAY.v; DELAY.v = 0; AUTO = true;
+  const res = { win: 0, lose: 0, draw: 0, stuck: 0 };
+  for (let k = 0; k < n; k++) { newGame(); if (S.over) res[S.result]++; else res.stuck++; }
+  DELAY.v = prev; AUTO = false; newGame();
+  return res;
+};
+
+$('newBtn').onclick = newGame;
+$('againBtn').onclick = newGame;
+$('rulesBtn').onclick = () => $('rules').hidden = false;
+$('rulesClose').onclick = () => $('rules').hidden = true;
+newGame();
+</script>
+</body>
+</html>

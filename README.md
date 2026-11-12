@@ -10,6 +10,15 @@ python -m http.server 8137 --directory D:/Durak
 
 Гра онлайн: https://vitaliypashkovskyi-ai.github.io/durak/
 
+## Гра з друзями (сервер)
+`server/` — Cloudflare Worker + Durable Objects: `wss://durak.durak-server.workers.dev`.
+- `/ws/room?room=КОД` — стіл на двох (колода й руки зберігаються лише на сервері).
+- `/ws/match` — черга випадкових суперників.
+- Гравець із Telegram перевіряється підписом `initData` (секрет `BOT_TOKEN`); поза Telegram — гість (`ALLOW_GUEST=1`).
+
+Локально: `cd server && npx wrangler dev --port 8787`, гра — `http://localhost:8137/?server=ws://localhost:8787`.
+Викласти: `cd server && npx wrangler deploy`.
+
 ## Бот на QNAP
 Папка `bot/` → на NAS у `/share/Pashkovskyi/durak-bot`. У `.env` вписати `BOT_TOKEN`,
 потім Container Station → Applications → Create → вставити `bot/docker-compose.yml`.

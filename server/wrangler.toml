@@ -1,0 +1,21 @@
+name = "durak"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# 1 = players outside Telegram (plain browser) may join as guests
+ALLOW_GUEST = "1"
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "Room"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room", "Lobby"]
+
+# BOT_TOKEN is a secret: npx wrangler secret put BOT_TOKEN

@@ -71,6 +71,12 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 .panel p{margin:6px 0;font-size:14px;line-height:1.45;text-align:left}
 .panel .big{font-size:48px;margin:4px 0}
 .panel button{margin-top:14px;border:0;border-radius:12px;padding:11px 26px;font-size:16px;font-weight:600;background:var(--blue);color:#fff;cursor:pointer}
+.panel .btns{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.panel .btns button{margin:0;width:100%}
+.panel button.sec{background:#e9e5da;color:#1b1b1b}
+.panel button:disabled{opacity:.6}
+.code{font:700 30px ui-monospace,Consolas,monospace;letter-spacing:5px;margin:6px 0;color:#1b1b1b}
+.muted{color:#666;font-size:14px;text-align:center!important;white-space:pre-line}
 .stripe{height:6px;border-radius:3px;background:linear-gradient(90deg,#0057b7 50%,#ffd700 50%);margin:12px 0 4px}
 </style>
 </head>
@@ -97,8 +103,27 @@ main{flex:1;display:flex;flex-direction:column;align-items:center;justify-conten
 <div id="toast"></div>
 <div class="overlay" id="over" hidden><div class="panel">
   <div class="big" id="overIcon"></div><h2 id="overTitle"></h2>
+  <p class="muted" id="overText"></p>
   <div class="stripe"></div>
-  <button id="againBtn">Ще раз</button>
+  <div class="btns">
+    <button id="againBtn">Ще раз</button>
+    <button id="overMenu" class="sec">Меню</button>
+  </div>
+</div></div>
+<div class="overlay" id="menu" hidden><div class="panel">
+  <div class="big">🃏</div><h2>Дурень</h2>
+  <div class="stripe"></div>
+  <div class="btns">
+    <button id="mBot">🤖 Грати з ботом</button>
+    <button id="mFriend">👥 Грати з другом</button>
+    <button id="mRandom">🎲 Випадковий суперник</button>
+  </div>
+</div></div>
+<div class="overlay" id="wait" hidden><div class="panel">
+  <h2 id="waitTitle"></h2>
+  <p class="muted" id="waitText"></p>
+  <div class="code" id="waitCode"></div>
+  <div class="btns" id="waitBtns"></div>
 </div></div>
 <div class="overlay" id="rules" hidden><div class="panel">
   <h2>Підкидний дурень</h2>
@@ -128,6 +153,7 @@ const RANKS = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
 const DELAY = { v: 650 };   // bot pace, ms (0 = instant, used by tests)
 let AUTO = false;           // when true, the AI also plays for the human (tests)
 let S = null;
+let MODE = 'bot', OPP = 'Бот';   // 'bot' = local game vs AI, 'online' = server game
 const seen = new Set();
 
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -153,6 +179,7 @@ function sortHand(h) { h.sort((a, b) => (a.s === S.trump) - (b.s === S.trump) ||
 function drawUp(p) { while (S.hands[p].length < 6 && S.deck.length) S.hands[p].push(S.deck.pop()); }
 
 function newGame() {
+  leaveOnline(); MODE = 'bot'; OPP = 'Бот'; hideOverlays();
   const deck = [];
   for (let s = 0; s < 4; s++) for (let r = 0; r < 9; r++) deck.push({ s, r, id: s * 9 + r });
   shuffle(deck);
@@ -164,7 +191,6 @@ function newGame() {
   S.attacker = l0 === l1 ? (Math.random() < .5 ? 0 : 1) : (l0 < l1 ? 0 : 1);
   sortHand(S.hands[0]);
   seen.clear();
-  document.getElementById('over').hidden = true;
   render();
   toast(S.attacker === 0 ? 'Ви ходите першим' : 'Бот ходить першим');
   tick();
@@ -215,10 +241,10 @@ function later(fn) {
   const gen = S.gen;
   if (DELAY.v === 0) return fn();
   S.busy = true;
-  setTimeout(() => { if (S.gen !== gen) return; S.busy = false; fn(); }, DELAY.v);
+  setTimeout(() => { if (!S || S.gen !== gen || MODE !== 'bot') return; S.busy = false; fn(); }, DELAY.v);
 }
 function tick() {
-  if (S.over) return;
+  if (S.over || MODE !== 'bot') return;
   const a = actor();
   // Attacker has nothing left to throw in -> close the bout automatically
   if (S.table.length && a === S.attacker && !S.hands[a].some(canAdd)) return later(finish);
@@ -275,12 +301,13 @@ function onHandTap(c, el) {
     if (S.sel != null && S.table[S.sel] && !S.table[S.sel].d && beats(S.table[S.sel].a, c)) i = S.sel;
     else i = S.table.findIndex(p => !p.d && beats(p.a, c));
     if (i < 0) return reject(el);
-    cover(0, i, c);
+    if (MODE === 'online') netSend({ t: 'cover', i, id: c.id }); else cover(0, i, c);
   } else {
     if (!canAdd(c)) return reject(el);
-    play(0, c);
+    if (MODE === 'online') netSend({ t: 'play', id: c.id }); else play(0, c);
   }
   S.sel = null;
+  if (MODE === 'online') { haptic('light'); S.busy = true; render(); return; } // wait for the server
   render(); tick();
 }
 function reject(el) { haptic('error'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
@@ -292,6 +319,7 @@ function btnMode() {
 document.getElementById('act').onclick = () => {
   const m = btnMode();
   if (!m) return;
+  if (MODE === 'online') { netSend({ t: m === 'take' ? 'take' : 'done' }); S.busy = true; render(); return; }
   if (m === 'take') { S.taking = true; S.sel = null; haptic('medium'); render(); tick(); }
   else finish();
 };
@@ -311,20 +339,28 @@ function statusText() {
   if (S.over) return S.result === 'win' ? 'Ви виграли!' : S.result === 'lose' ? 'Ви — дурень 🙃' : 'Нічия';
   const a = actor();
   if (a === 1) {
-    if (S.taking && defender() === 0) return 'Ви берете. Бот підкидає…';
-    return 'Бот думає…';
+    if (S.taking && defender() === 0) return `Ви берете. ${OPP} підкидає…`;
+    return MODE === 'online' ? `Хід: ${OPP}…` : 'Бот думає…';
   }
+  if (S.busy) return '…';
   if (!S.table.length) return 'Ваш хід — киньте карту';
   if (humanDefending()) return undefended() > 1 ? 'Відбивайтесь (торкніться карти на столі, щоб вибрати ціль)' : 'Відбивайтесь або беріть';
-  if (S.taking) return 'Бот бере. Підкиньте ще або «Віддати»';
-  return 'Бот відбився. Підкиньте або «Бито»';
+  if (S.taking) return `${OPP} бере. Підкиньте ще або «Віддати»`;
+  return 'Відбито. Підкиньте або «Бито»';
 }
 
 function render() {
-  // bot
+  $('stats').textContent = `🏆 ${stats.win} · 🙃 ${stats.lose}`;
+  if (!S) {
+    ['botHand', 'deck', 'table', 'hand'].forEach(id => $(id).innerHTML = '');
+    ['botLabel', 'infoText', 'status'].forEach(id => $(id).textContent = '');
+    $('act').hidden = true;
+    return;
+  }
+  // opponent
   const bh = $('botHand'); bh.innerHTML = '';
   S.hands[1].forEach(() => bh.appendChild(backEl()));
-  $('botLabel').textContent = `Бот · ${S.hands[1].length} карт`;
+  $('botLabel').textContent = `${OPP} · ${S.hands[1].length} карт` + (MODE === 'online' && !oppOnline ? ' · не в мережі' : '');
   // deck
   const dk = $('deck'); dk.innerHTML = '';
   if (S.deck.length) {
@@ -365,7 +401,6 @@ function render() {
   act.className = m === 'take' ? 'take' : '';
   act.textContent = m === 'take' ? 'Беру' : m === 'give' ? 'Віддати' : 'Бито';
   $('status').textContent = statusText();
-  $('stats').textContent = `🏆 ${stats.win} · 🙃 ${stats.lose}`;
   layoutRow(hd, 6); layoutRow(bh, 3);
 }
 function layoutRow(row, gap) {
@@ -385,10 +420,177 @@ function toast(t) {
   clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1100);
 }
 function showOver() {
+  if (!S || !S.over) return;
   const r = S.result;
   $('overIcon').textContent = r === 'win' ? '🏆' : r === 'lose' ? '🙃' : '🤝';
   $('overTitle').textContent = r === 'win' ? 'Перемога!' : r === 'lose' ? 'Ви — дурень' : 'Нічия';
+  $('overText').textContent = '';
+  $('againBtn').disabled = false; $('againBtn').textContent = 'Ще раз';
   $('over').hidden = false;
+  if (MODE === 'online' && LAST) updateAgain(LAST);
+}
+function updateAgain(m) {
+  const me = m.seat, other = 1 - me;
+  let t = '';
+  if (m.forfeit) t = m.loser === me ? 'Ви надто довго були не в мережі' : `${OPP} вийшов із гри`;
+  if (m.again.includes(other)) t = `${OPP} хоче зіграти ще раз`;
+  if (!m.online[other]) t = `${OPP} вийшов`;
+  $('overText').textContent = t;
+  const waiting = m.again.includes(me);
+  $('againBtn').disabled = waiting || !m.online[other];
+  $('againBtn').textContent = waiting ? 'Чекаємо суперника…' : 'Ще раз';
+}
+
+// ---------- Online ----------
+const SERVER = 'wss://durak.durak-server.workers.dev';  // Cloudflare Worker
+const APP_LINK = '';  // Mini App link from @BotFather /newapp, e.g. https://t.me/DurenUA_bot/durak
+const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
+let NET = null, NETGEN = 0, ROOM = null, LAST = null, oppOnline = true, lastGame = 0, shownOver = 0, waitTimer = null, GID = null;
+const serverBase = () => new URLSearchParams(location.search).get('server') || SERVER;
+const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const genCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPH[b % ALPH.length]).join('');
+
+function hello() {
+  if (tg && tg.initData) return { t: 'hello', init: tg.initData };
+  if (!GID) {
+    try { GID = sessionStorage.getItem('durak.gid'); } catch (e) {}
+    if (!GID) {
+      GID = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('');
+      try { sessionStorage.setItem('durak.gid', GID); } catch (e) {}
+    }
+  }
+  return { t: 'hello', guest: { id: GID, name: 'Гість ' + GID.slice(0, 4).toUpperCase() } };
+}
+function openSocket(path, onMsg, onClose) {
+  const ws = new WebSocket(serverBase() + path);
+  ws.onopen = () => ws.send(JSON.stringify(hello()));
+  ws.onmessage = e => { let m; try { m = JSON.parse(e.data); } catch (x) { return; } onMsg(m); };
+  ws.onclose = e => onClose && onClose(e);
+  return ws;
+}
+function netSend(o) {
+  if (NET && NET.readyState === 1) NET.send(JSON.stringify(o));
+  else toast('Немає з’єднання');
+}
+function leaveOnline() {
+  NETGEN++; ROOM = null; LAST = null;
+  clearInterval(waitTimer);
+  if (NET) { try { NET.close(1000); } catch (e) {} NET = null; }
+}
+function hideOverlays() { ['menu', 'wait', 'over', 'rules'].forEach(id => $(id).hidden = true); }
+function showMenu() { leaveOnline(); MODE = 'bot'; hideOverlays(); $('menu').hidden = false; }
+function showWait(title, text, code, buttons) {
+  hideOverlays();
+  $('waitTitle').textContent = title;
+  $('waitText').textContent = text;
+  $('waitCode').textContent = code || '';
+  const box = $('waitBtns'); box.innerHTML = '';
+  buttons.forEach(b => {
+    const el = document.createElement('button');
+    el.textContent = b.text; if (b.sec) el.className = 'sec';
+    el.onclick = b.fn; box.appendChild(el);
+  });
+  $('wait').hidden = false;
+}
+
+function joinRoom(code) {
+  leaveOnline(); hideOverlays();
+  MODE = 'online'; ROOM = code; S = null; OPP = 'Суперник'; render();
+  const gen = NETGEN;
+  let attempts = 0;
+  showWait('Підключення…', '', '', [{ text: 'Скасувати', sec: true, fn: showMenu }]);
+  const connect = () => {
+    if (gen !== NETGEN) return;
+    NET = openSocket('/ws/room?room=' + code, m => { attempts = 0; onRoomMsg(m); }, e => {
+      if (gen !== NETGEN) return;
+      if (e.code === 4009 || e.code === 4003) return;     // full / not verified: the message is already shown
+      if (e.code === 4000) return showWait('Гра відкрита в іншому вікні', '', '', [{ text: 'Меню', fn: showMenu }]);
+      attempts++;
+      if (attempts > 8) return showWait('Немає з’єднання', 'Не вдалося підключитися до сервера.', '', [
+        { text: 'Спробувати ще', fn: () => joinRoom(code) }, { text: 'Меню', sec: true, fn: showMenu }]);
+      toast('Перепідключення…');
+      setTimeout(connect, Math.min(5000, 800 * attempts));
+    });
+  };
+  connect();
+}
+
+function onRoomMsg(m) {
+  if (m.type === 'error') return showWait('Не вийшло', m.text, '', [{ text: 'Меню', fn: showMenu }]);
+  if (m.type !== 'state') return;
+  LAST = m;
+  const me = m.seat, other = 1 - me;
+  OPP = m.names[other] || 'Суперник';
+  oppOnline = m.online[other];
+  if (!m.started) { if ($('waitTitle').textContent !== 'Чекаємо друга' || $('wait').hidden) showInvite(); return; }
+  if (!$('wait').hidden) $('wait').hidden = true;
+  const map = s => (s === me ? 0 : 1);
+  const prevSel = S && S.table && S.table.length === m.table.length ? S.sel : null;
+  S = {
+    deck: new Array(m.deck).fill(null), trump: m.trump, trumpCard: m.trumpCard,
+    hands: [m.hand, new Array(m.opp).fill(null)], table: m.table, attacker: map(m.attacker),
+    taking: m.taking, sel: prevSel, over: m.over, busy: false, out: m.out, gen: m.game, result: null,
+  };
+  sortHand(S.hands[0]);
+  if (m.game !== lastGame) {
+    lastGame = m.game; seen.clear(); $('over').hidden = true;
+    toast(S.attacker === 0 ? 'Ви ходите першим' : `${OPP} ходить першим`);
+  } else if (m.ev) {
+    toast(m.ev.kind === 'bito' ? 'Бито' : map(m.ev.who) === 0 ? 'Ви взяли' : `${OPP} забирає карти`);
+  }
+  if (m.over) {
+    S.result = m.loser === -1 ? 'draw' : m.loser === me ? 'lose' : 'win';
+    if (shownOver !== m.game) {
+      shownOver = m.game;
+      stats[S.result]++; saveStats();
+      haptic(S.result === 'lose' ? 'error' : 'success');
+      setTimeout(showOver, 500);
+    } else if (!$('over').hidden) updateAgain(m);
+  }
+  render();
+}
+
+function inviteLink() { return APP_LINK ? `${APP_LINK}?startapp=${ROOM}` : `${PAGE_URL}?room=${ROOM}`; }
+function showInvite() {
+  showWait('Чекаємо друга', 'Надішліть другу посилання.\nГра почнеться, щойно він його відкриє.', ROOM, [
+    { text: '📨 Надіслати в Telegram', fn: shareInvite },
+    { text: '📋 Скопіювати посилання', sec: true, fn: copyInvite },
+    { text: 'Скасувати', sec: true, fn: showMenu },
+  ]);
+}
+function shareInvite() {
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent('Зіграймо в дурня! 🃏');
+  if (tg && tg.initData && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
+}
+function copyInvite() {
+  const t = inviteLink();
+  const done = () => toast('Посилання скопійовано');
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, () => prompt('Посилання:', t));
+  else prompt('Посилання:', t);
+}
+
+function findMatch() {
+  leaveOnline(); hideOverlays();
+  MODE = 'online'; S = null; render();
+  const gen = NETGEN, t0 = Date.now();
+  showWait('Випадковий суперник', '', '', [
+    { text: '🤖 Грати з ботом', sec: true, fn: newGame },
+    { text: 'Скасувати', sec: true, fn: showMenu },
+  ]);
+  const upd = () => {
+    const s = Math.floor((Date.now() - t0) / 1000);
+    $('waitText').textContent = `Шукаємо суперника… ${s} с` + (s >= 20 ? '\nПоки нікого немає — можна зіграти з ботом.' : '');
+  };
+  upd(); waitTimer = setInterval(upd, 1000);
+  NET = openSocket('/ws/match', m => {
+    if (m.type === 'matched') joinRoom(m.room);
+    else if (m.type === 'error') { clearInterval(waitTimer); showWait('Не вийшло', m.text, '', [{ text: 'Меню', fn: showMenu }]); }
+  }, e => {
+    if (gen !== NETGEN || e.code === 1000) return;
+    clearInterval(waitTimer);
+    showWait('Немає з’єднання', 'Не вдалося підключитися до сервера.', '', [
+      { text: 'Спробувати ще', fn: findMatch }, { text: 'Меню', sec: true, fn: showMenu }]);
+  });
 }
 
 // ---------- Stats ----------
@@ -408,11 +610,22 @@ window.simulate = function (n) {
   return res;
 };
 
-$('newBtn').onclick = newGame;
-$('againBtn').onclick = newGame;
+$('newBtn').onclick = showMenu;
+$('againBtn').onclick = () => {
+  if (MODE !== 'online') return newGame();
+  netSend({ t: 'again' });
+  $('againBtn').disabled = true; $('againBtn').textContent = 'Чекаємо суперника…';
+};
+$('overMenu').onclick = showMenu;
+$('mBot').onclick = newGame;
+$('mFriend').onclick = () => joinRoom(genCode());
+$('mRandom').onclick = findMatch;
 $('rulesBtn').onclick = () => $('rules').hidden = false;
 $('rulesClose').onclick = () => $('rules').hidden = true;
-newGame();
+
+const startRoom = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) ||
+  new URLSearchParams(location.search).get('room') || '').toUpperCase();
+if (/^[A-Z0-9]{4,8}$/.test(startRoom)) joinRoom(startRoom); else showMenu();
 </script>
 </body>
 </html>

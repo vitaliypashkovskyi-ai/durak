@@ -443,7 +443,7 @@ function updateAgain(m) {
 
 // ---------- Online ----------
 const SERVER = 'wss://durak.durak-server.workers.dev';  // Cloudflare Worker
-const APP_LINK = '';  // Mini App link from @BotFather /newapp, e.g. https://t.me/DurenUA_bot/durak
+const APP_LINK = 'https://t.me/DurenUA_bot';  // bot's main Mini App: ?startapp=CODE opens the game in Telegram
 const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
 let NET = null, NETGEN = 0, ROOM = null, LAST = null, oppOnline = true, lastGame = 0, shownOver = 0, waitTimer = null, GID = null;
 const serverBase = () => new URLSearchParams(location.search).get('server') || SERVER;

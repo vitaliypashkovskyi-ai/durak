@@ -1,6 +1,6 @@
 // Мафія: screen — phase and timer, your role, players (tap = your night action or day vote), chat.
 import { ROLES } from './mafia-engine.js';
-import { $, haptic, toast, sfx } from './common.js';
+import { $, haptic, toast, sfx, mark } from './common.js';
 
 export const rules = `
 <p>5–12 гравців. Ролі роздає гра: <b>мафія</b> (1–3), <b>лікар</b>, <b>комісар</b>, решта — <b>мирні</b>. Свою роль бачите лише ви; мафія знає одне одного.</p>
@@ -36,7 +36,7 @@ export function mount(box, a) {
 function nm(i) {
   if (i === V.seat) return 'Ви';
   const p = V.players[i];
-  return (p.bot ? '🤖 ' : '') + p.name;
+  return (p.bot ? '🤖 ' : '') + p.name + mark(i);
 }
 const roleText = r => `${ROLES[r].icon} ${ROLES[r].name}`;
 

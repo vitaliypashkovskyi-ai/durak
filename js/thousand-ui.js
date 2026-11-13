@@ -1,6 +1,6 @@
 // Тисяча: screen — torg, prykup, contract, tricks, deal results.
 import * as E from './thousand-engine.js';
-import { $, haptic, toast, sfx } from './common.js';
+import { $, haptic, toast, sfx, mark } from './common.js';
 
 export const rules = `
 <p>3 гравці, 24 карти (9, валет, дама, король, 10, туз). Очки: туз 11, десятка 10, король 4, дама 3, валет 2, дев'ятка 0. У колоді 120 очок.</p>
@@ -27,7 +27,7 @@ export function mount(box, a) {
 function nm(i, acc) {
   if (i === V.seat) return acc ? 'вас' : 'Ви';
   const p = V.players[i];
-  return (p.bot ? '🤖 ' : '') + p.name;
+  return (p.bot ? '🤖 ' : '') + p.name + mark(i);
 }
 const suitHtml = s => `<b class="${s >= 2 ? 'redsuit' : ''}">${E.SUITS[s]}</b>`;
 

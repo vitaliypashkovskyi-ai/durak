@@ -88,6 +88,31 @@ header{gap:6px}
   repeating-linear-gradient(-45deg,transparent 0 6px,#1b1b1b 6px 8px),#fffdf7;
   box-shadow:inset 0 0 0 3px #fffdf7,inset 0 0 0 5px #b3201f,0 2px 6px rgba(0,0,0,.35)}
 .card.tiny.back{background:repeating-linear-gradient(45deg,transparent 0 3px,#b3201f 3px 4px),#fffdf7}
+/* card backs unlocked by level */
+body[data-back="petr"] .back{background:
+  radial-gradient(circle at 30% 28%,#e8541e 0 14%,transparent 15%),
+  radial-gradient(circle at 70% 72%,#f2a922 0 13%,transparent 14%),
+  radial-gradient(circle at 72% 26%,#2e7d32 0 8%,transparent 9%),
+  radial-gradient(circle at 28% 74%,#2e7d32 0 8%,transparent 9%),#fff6e0;
+  background-size:100% 50%;box-shadow:inset 0 0 0 3px #fff6e0,inset 0 0 0 5px #e8541e,0 2px 6px rgba(0,0,0,.35)}
+body[data-back="petr"] .card.tiny.back{background:radial-gradient(circle,#e8541e 0 30%,transparent 32%),#fff6e0;background-size:7px 7px}
+body[data-back="gold"] .back{background:
+  repeating-linear-gradient(45deg,#b8860b 0 3px,#f5d76e 3px 7px),#f5d76e;
+  box-shadow:inset 0 0 0 3px #fff4c7,inset 0 0 0 5px #8a6508,0 2px 6px rgba(0,0,0,.35)}
+body[data-back="gold"] .card.tiny.back{background:repeating-linear-gradient(45deg,#b8860b 0 2px,#f5d76e 2px 4px)}
+/* tables */
+body[data-table="blue"]{--felt:#1f4f8a;--felt2:#11294a}
+body[data-table="wine"]{--felt:#7a2232;--felt2:#3a0e17}
+body[data-table="night"]{--felt:#2b2b30;--felt2:#0c0c0f;--gold:#f0c75e}
+body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2c22 0%,#0c0c0f 80%)}
+/* look panel */
+.looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0 2px}
+.look{border:2px solid transparent;border-radius:12px;background:#f1ede2;padding:8px 6px;text-align:center;font:inherit;color:#1b1b1b;cursor:pointer}
+.look.on{border-color:var(--blue)}
+.look.locked{opacity:.5;cursor:default}
+.look .sw{display:block;margin:0 auto 4px;width:46px;height:34px;border-radius:8px}
+.look .sw.card{width:30px;height:42px;border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.look small{display:block;font-size:11px;color:#666}
 #hand .card{cursor:pointer}
 #hand .card.ok{transform:translateY(-10px)}
 #hand .card.dim{filter:brightness(.62)}
@@ -247,23 +272,23 @@ header{gap:6px}
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=19",
-  "./js/host.js": "./js/host.js?v=19",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=19",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=19",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=19",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=19",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=19",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=19",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=19",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=19",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=19",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=19",
-  "./js/spy-data.js": "./js/spy-data.js?v=19",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=19",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=19"
+  "./js/common.js": "./js/common.js?v=20",
+  "./js/host.js": "./js/host.js?v=20",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=20",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=20",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=20",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=20",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=20",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=20",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=20",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=20",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=20",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=20",
+  "./js/spy-data.js": "./js/spy-data.js?v=20",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=20",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=20"
 } }
 </script>
-<script type="module" src="js/app.js?v=19"></script>
+<script type="module" src="js/app.js?v=20"></script>
 </body>
 </html>

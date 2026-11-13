@@ -1,5 +1,5 @@
 // Games hub: menu, games with bots (in the page) and online rooms (Cloudflare server).
-import { $, tg, inTelegram, haptic, toast, showPanel, hidePanel, panelKind, sfx, sound, setSound } from './common.js';
+import { $, tg, inTelegram, haptic, toast, showPanel, hidePanel, panelKind, sfx, sound, setSound, levels, LVL_MARK } from './common.js';
 import * as durakE from './durak-engine.js';
 import * as battleE from './battle-engine.js';
 import * as durakUI from './durak-ui.js';
@@ -31,7 +31,83 @@ GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравці�
 GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2', E: goatE, UI: goatUI, minP: 4, maxP: 4, noRandom: true };
 const SOON = [['🎴', 'Свара'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
 
-if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }
+if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+
+// ---------- looks unlocked by level: card backs and tables ----------
+const LEVEL_NAMES = ['Новачок 🌱', 'Аматор 🙂', 'Гравець 🎯', 'Досвідчений 💪', 'Майстер 🏅', 'Легенда 👑'];
+const LEVEL_AT = [0, 15, 40, 90, 180, 350];
+const LOOKS = {
+  back: [
+    ['vysh', 'Вишиванка', 0, 'repeating-linear-gradient(45deg,#fffdf7 0 4px,#b3201f 4px 6px)'],
+    ['petr', 'Петриківка', 1, 'radial-gradient(circle,#e8541e 0 30%,transparent 32%) 0 0/12px 12px,#fff6e0'],
+    ['gold', 'Золота', 4, 'repeating-linear-gradient(45deg,#b8860b 0 3px,#f5d76e 3px 7px)'],
+  ],
+  table: [
+    ['green', 'Зелений', 0, 'radial-gradient(#21603e,#143a27)', '#143a27'],
+    ['blue', 'Синій', 2, 'radial-gradient(#1f4f8a,#11294a)', '#11294a'],
+    ['wine', 'Бордовий', 3, 'radial-gradient(#7a2232,#3a0e17)', '#3a0e17'],
+    ['night', 'Нічний', 5, 'radial-gradient(#2f2c22,#0c0c0f)', '#0c0c0f'],
+  ],
+};
+function applyLook() {
+  const l = pref('look', {});
+  const back = LOOKS.back.find(x => x[0] === l.back) || LOOKS.back[0];
+  const table = LOOKS.table.find(x => x[0] === l.table) || LOOKS.table[0];
+  document.body.dataset.back = back[0];
+  document.body.dataset.table = table[0];
+  if (tg) { try { tg.setHeaderColor(table[4]); tg.setBackgroundColor(table[4]); } catch (e) {} }
+}
+applyLook();
+
+async function showLooks() {
+  showPanel({ kind: 'looks', icon: '🎨', title: 'Оформлення', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  let lvl = 0, points = 0;
+  if (inTelegram) {
+    try {
+      const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) });
+      if (r.ok) { const me = await r.json(); lvl = me.level.idx || 0; points = me.points || 0; }
+    } catch (e) {}
+  }
+  if (panelKind() !== 'looks') return;
+  drawLooks(lvl, points);
+}
+function drawLooks(lvl, points) {
+  const cur = pref('look', {});
+  const body = document.createElement('div');
+  const section = (title, key) => {
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = title;
+    const grid = document.createElement('div'); grid.className = 'looks';
+    LOOKS[key].forEach(([id, name, need, swatch]) => {
+      const open = lvl >= need, on = (cur[key] || LOOKS[key][0][0]) === id;
+      const b = document.createElement('button');
+      b.className = 'look' + (on ? ' on' : '') + (open ? '' : ' locked');
+      const sw = document.createElement('span'); sw.className = 'sw' + (key === 'back' ? ' card' : ''); sw.style.background = swatch;
+      const n = document.createElement('b'); n.textContent = name;
+      const s = document.createElement('small');
+      s.textContent = !open ? `🔒 ${LEVEL_NAMES[need]} · ${LEVEL_AT[need]} оч.` : on ? '✓ обрано' : 'обрати';
+      b.append(sw, n, s);
+      b.onclick = () => {
+        if (!open) return toast(`Відкриється на рівні «${LEVEL_NAMES[need]}»`);
+        setPref('look', Object.assign({}, pref('look', {}), { [key]: id }));
+        applyLook(); sfx('pop'); drawLooks(lvl, points);
+      };
+      grid.appendChild(b);
+    });
+    body.append(l, grid);
+  };
+  section('Сорочка карт', 'back');
+  section('Стіл', 'table');
+  const m = document.createElement('p'); m.className = 'muted';
+  m.textContent = 'Позначка біля імені, яку бачать суперники: ⭐ з рівня «Досвідчений», 🏅 «Майстер», 👑 «Легенда».';
+  body.appendChild(m);
+  const next = LEVEL_AT[lvl + 1];
+  showPanel({
+    kind: 'looks', icon: '🎨', title: 'Оформлення', body,
+    text: inTelegram ? `Ваш рівень: ${LEVEL_NAMES[lvl]} · ${points} оч.` + (next ? `\nДо наступного: ${next - points} оч. — грайте онлайн і забирайте 🎁 бонус дня` : '')
+      : 'Нові сорочки й столи відкриваються з рівнем — грайте в Telegram (@IgryUA_bot).',
+    buttons: [{ text: 'Готово', fn: hidePanel }],
+  });
+}
 
 // ---------- storage ----------
 function pref(k, d) { try { const v = localStorage.getItem('games.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
@@ -82,11 +158,18 @@ function showHub() {
     b.onclick = () => joinRoom(last.code, null);
     top.appendChild(b);
   }
+  const row0 = document.createElement('div');
+  row0.className = 'hubrow';
   const codeBtn = document.createElement('button');
   codeBtn.className = 'hubact';
-  codeBtn.textContent = '🔑 Увійти за кодом кімнати';
+  codeBtn.textContent = '🔑 Код кімнати';
   codeBtn.onclick = askCode;
-  top.appendChild(codeBtn);
+  const lookBtn = document.createElement('button');
+  lookBtn.className = 'hubact';
+  lookBtn.textContent = '🎨 Оформлення';
+  lookBtn.onclick = showLooks;
+  row0.append(codeBtn, lookBtn);
+  top.appendChild(row0);
   const open = url => { if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); };
   const row = document.createElement('div');
   row.className = 'hubrow';
@@ -224,6 +307,7 @@ function startLocal(game, cfg, n) {
   G.num = ++localNum;
   const host = new Host(g.E, G, { onChange: () => onView(g.E.view(G, 0)) });
   S = { kind: 'local', game, cfg, n, host, act: m => host.act(0, m) };
+  levels.list = null;
   api.online = null;
   openGame(game);
   host.changed();
@@ -414,6 +498,7 @@ function onRoomMsg(m) {
   if (!S.mounted || S.game !== m.game) { S.game = m.game; S.mounted = true; openGame(m.game); }
   if (['lobby', 'connect'].includes(panelKind())) hidePanel();
   api.online = m.online;
+  levels.list = m.levels || null;
   onView(m);
 }
 
@@ -425,7 +510,7 @@ function showLobby(m) {
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {
     const li = document.createElement('li');
-    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${i === me ? ' (ви)' : ''}${i === m.host ? ' 👑' : ''}${s.online ? '' : ' 📴'}`;
+    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${LVL_MARK[s.lvl] ? ' ' + LVL_MARK[s.lvl] : ''}${i === me ? ' (ви)' : ''}${i === m.host ? ' (ведучий)' : ''}${s.online ? '' : ' 📴'}`;
     ul.appendChild(li);
   });
   for (let i = m.seats.length; i < m.cfg.max; i++) {

@@ -1,6 +1,6 @@
 // Козел: screen — partner opposite, team score, the trick, deal results.
 import * as E from './goat-engine.js';
-import { $, haptic, toast, sfx } from './common.js';
+import { $, haptic, toast, sfx, mark } from './common.js';
 
 export const rules = `
 <p>4 гравці, дві пари: ваш <b>партнер</b> сидить навпроти. 36 карт, по 9 у руці.</p>
@@ -25,7 +25,7 @@ export function mount(box, a) {
 function nm(i) {
   if (i === V.seat) return 'Ви';
   const p = V.players[i];
-  return (p.bot ? '🤖 ' : '') + p.name;
+  return (p.bot ? '🤖 ' : '') + p.name + mark(i);
 }
 const myTeam = () => E.team(V.seat);
 

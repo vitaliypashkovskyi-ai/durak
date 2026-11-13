@@ -12,7 +12,7 @@ export function level(points) {
   let i = 0;
   while (i + 1 < LEVELS.length && points >= LEVELS[i + 1][0]) i++;
   const next = LEVELS[i + 1];
-  return { name: LEVELS[i][1], next: next ? { name: next[1], at: next[0] } : null };
+  return { idx: i, name: LEVELS[i][1], next: next ? { name: next[1], at: next[0] } : null };
 }
 // [icon, name, how to get it, progress(p), goal]
 const ACHIEVEMENTS = [

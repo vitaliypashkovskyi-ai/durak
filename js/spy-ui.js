@@ -1,5 +1,5 @@
 // Шпигун: screen — your card (location or "spy"), players and votes, locations list, chat.
-import { $, haptic, toast, showPanel, hidePanel, sfx } from './common.js';
+import { $, haptic, toast, showPanel, hidePanel, sfx, mark } from './common.js';
 
 export const rules = `
 <p>3–10 гравців. Усі, крім одного, бачать <b>локацію</b> (пляж, лікарня, потяг…). Один гравець — <b>шпигун</b>: він локації не знає.</p>
@@ -30,7 +30,7 @@ export function mount(box, a) {
   timer = setInterval(tickTimer, 500);
 }
 
-function nm(i) { if (i === V.seat) return 'Ви'; const p = V.players[i]; return (p.bot ? '🤖 ' : '') + p.name; }
+function nm(i) { if (i === V.seat) return 'Ви'; const p = V.players[i]; return (p.bot ? '🤖 ' : '') + p.name + mark(i); }
 
 export function render(v) {
   const fresh = v.num !== lastNum;

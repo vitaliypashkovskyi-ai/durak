@@ -1,6 +1,6 @@
 // Дурень: screen. Draws a player's view and turns taps into moves.
 import * as E from './durak-engine.js';
-import { $, haptic, toast, showPanel, hidePanel, sfx } from './common.js';
+import { $, haptic, toast, showPanel, hidePanel, sfx, mark } from './common.js';
 
 export const rules = `
 <p>Колода 36 карт (до 6 гравців), 52 (до 8) або дві по 36 (до 12), по 6 у руці. Козир — нижня карта колоди, будь-який козир б'є некозирну карту.</p>
@@ -33,7 +33,7 @@ export function mount(box, a) {
 function nm(i, acc) {
   if (i === V.seat) return acc ? 'вас' : 'Ви';
   const p = V.players[i];
-  return (p.bot ? '🤖 ' : '') + p.name;
+  return (p.bot ? '🤖 ' : '') + p.name + mark(i);
 }
 
 const onTable = v => v.table.reduce((n, p) => n + (p.d ? 2 : 1), 0);

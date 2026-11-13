@@ -1,5 +1,5 @@
 // Морський бій: screen.
-import { $, haptic, toast, sfx } from './common.js';
+import { $, haptic, toast, sfx, mark } from './common.js';
 
 export const rules = `
 <p>Поле 10×10. Флот: один корабель на 4 клітинки, два на 3, три на 2 і чотири на 1. Кораблі не торкаються навіть кутами.</p>
@@ -26,7 +26,7 @@ export function mount(box, a) {
 function nm(i) {
   if (i === V.seat) return 'Ви';
   const p = V.players[i];
-  return (p.bot ? '🤖 ' : '') + p.name;
+  return (p.bot ? '🤖 ' : '') + p.name + mark(i);
 }
 
 export function render(v) {

@@ -234,6 +234,11 @@ export class Room {
     }
     if (s.ws && s.ws !== ws) { try { s.ws.close(4000, 'replaced'); } catch {} }
     s.ws = ws; s.name = user.name;
+    if (s.lvl == null && s.id.startsWith('tg:')) {
+      // the player's level (for the ⭐🏅👑 mark others see); looked up once per seat
+      s.lvl = 0;
+      statsCall(this.env, '/profile', { id: s.id }).then(p => { s.lvl = (p.level && p.level.idx) || 0; if (s.lvl >= 3) this.broadcast(); }).catch(() => {});
+    }
     clearTimeout(this.timers.get(s.id));
     if (s.bot && this.G) {           // came back: take the seat back from the bot
       s.bot = false;
@@ -349,7 +354,7 @@ export class Room {
       return {
         type: 'lobby', game: cfg.game, cfg, you: i,
         host: this.seats.findIndex(x => x.id === this.hostId),
-        seats: this.seats.map(x => ({ name: x.name, bot: x.botOnly, online: x.botOnly || !!x.ws })),
+        seats: this.seats.map(x => ({ name: x.name, bot: x.botOnly, online: x.botOnly || !!x.ws, lvl: x.lvl || 0 })),
       };
     }
     const v = ENGINES[cfg.game].view(this.G, i);
@@ -357,6 +362,7 @@ export class Room {
     v.cfg = cfg;
     v.online = this.seats.map(x => x.botOnly || x.bot || !!x.ws);
     v.again = this.seats.map(x => this.again.has(x.id));
+    v.levels = this.seats.map(x => x.lvl || 0);
     return v;
   }
   broadcast() { this.seats.forEach((s, i) => { if (s.ws) send(s.ws, this.view(i)); }); }

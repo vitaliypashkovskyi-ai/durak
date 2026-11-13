@@ -6,11 +6,14 @@
 // shared with the page, so hidden cards never leave the server.
 import * as durak from '../../js/durak-engine.js';
 import * as battle from '../../js/battle-engine.js';
+import * as mafia from '../../js/mafia-engine.js';
 import { Host } from '../../js/host.js';
 
-const ENGINES = { durak, battle };
-const MAX = { durak: 6, battle: 4 };
-const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан'];
+const ENGINES = { durak, battle, mafia };
+const MIN = { durak: 2, battle: 2, mafia: 5 };
+const MAX = { durak: 6, battle: 4, mafia: 12 };
+const NO_RANDOM = new Set(['mafia']);
+const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
 const LEFT_MS = 60000;       // a human offline for this long is replaced by a bot
 const LOBBY_KEEP_MS = 180000; // before the start, an offline player keeps the seat this long
@@ -24,7 +27,7 @@ export default {
     if (url.pathname === '/ws/match') {
       const game = url.searchParams.get('game') || 'durak';
       const variant = url.searchParams.get('variant') === 'perevod' ? 'perevod' : '';
-      if (!ENGINES[game]) return new Response('bad game', { status: 400 });
+      if (!ENGINES[game] || NO_RANDOM.has(game)) return new Response('bad game', { status: 400 });
       return env.LOBBY.get(env.LOBBY.idFromName(`${game}:${variant}`)).fetch(req);
     }
     if (url.pathname === '/ws/room') {
@@ -119,7 +122,7 @@ export class Lobby {
 // ---------- rooms ----------
 function roomConfig(c) {
   if (!c || !ENGINES[c.game]) return null;
-  const cfg = { game: c.game, max: MAX[c.game] };
+  const cfg = { game: c.game, min: MIN[c.game], max: MAX[c.game] };
   if (c.game === 'durak') cfg.variant = c.variant === 'perevod' ? 'perevod' : 'podkidnoy';
   if (c.auto === 2) cfg.auto = 2;
   return cfg;
@@ -227,7 +230,7 @@ export class Room {
     this.seats = this.seats.filter(s => s.botOnly || s.ws);
     this.seats.forEach(s => { s.bot = false; });
     this.fixHost();
-    if (this.seats.length >= 2 && this.humans().length) return this.start();
+    if (this.seats.length >= this.cfg.min && this.humans().length) return this.start();
     if (this.host) this.host.stop();
     this.G = null; this.host = null; this.again.clear();
     this.broadcast();
@@ -251,7 +254,7 @@ export class Room {
       } else if (m.t === 'removeBot') {
         const k = this.seats.map(x => x.botOnly).lastIndexOf(true);
         if (k >= 0) this.seats.splice(k, 1);
-      } else if (m.t === 'start' && this.seats.length >= 2) {
+      } else if (m.t === 'start' && this.seats.length >= this.cfg.min) {
         return this.start();
       }
       return this.broadcast();

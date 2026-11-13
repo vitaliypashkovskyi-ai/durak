@@ -121,9 +121,15 @@ function endBout(G) {
   const out = [];
   if (!G.deck.length) G.hands.forEach((h, i) => { if (!h.length && !G.done[i]) { G.done[i] = true; out.push(i); } });
   G.ev = { kind: took ? 'took' : 'bito', who: def, out };
+  G.bouts = (G.bouts || 0) + 1;
   const active = [];
   G.done.forEach((d, i) => { if (!d) active.push(i); });
   if (active.length <= 1) { G.over = true; G.loser = active.length ? active[0] : -1; return; }
+  if (G.bouts > 300) {   // safety net: an endless game ends, the most cards loses
+    G.over = true;
+    G.loser = active.reduce((a, b) => (G.hands[b].length > G.hands[a].length ? b : a));
+    return;
+  }
   const a = took || G.done[def] ? nextActive(G, def) : def;
   G.attacker = a;
   G.defender = nextActive(G, a);
@@ -166,7 +172,12 @@ function planDefense(G, seat) {
 export function botAction(G, seat) {
   if (G.over || G.endAt || G.done[seat]) return null;
   const hand = G.hands[seat], by = (a, b) => val(G, a) - val(G, b);
-  if (!G.table.length) return seat === G.attacker && hand.length ? { t: 'play', id: [...hand].sort(by)[0].id } : null;
+  if (!G.table.length) {
+    if (seat !== G.attacker || !hand.length) return null;
+    // endgame: sometimes lead a random card, otherwise bots can pass the same cards around forever
+    const c = !G.deck.length && rnd(10) < 4 ? hand[rnd(hand.length)] : [...hand].sort(by)[0];
+    return { t: 'play', id: c.id };
+  }
   if (seat === G.defender) {
     if (G.taking || !undefended(G)) return null;
     const transfers = hand.filter(c => canTransfer(G, seat, c)).sort(by);

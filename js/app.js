@@ -4,18 +4,21 @@ import * as durakE from './durak-engine.js';
 import * as battleE from './battle-engine.js';
 import * as durakUI from './durak-ui.js';
 import * as battleUI from './battle-ui.js';
+import * as mafiaE from './mafia-engine.js';
+import * as mafiaUI from './mafia-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
 const APP_LINK = 'https://t.me/DurenUA_bot';   // bot's main Mini App: ?startapp=CODE
 const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
-const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан'];
+const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 
 const GAMES = {
   durak: { title: 'Дурень', icon: '🃏', sub: '2–6 гравців', E: durakE, UI: durakUI, minP: 2, maxP: 6, variants: true },
   battle: { title: 'Морський бій', icon: '🚢', sub: '2–4 гравці', E: battleE, UI: battleUI, minP: 2, maxP: 4 },
+  mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7, noRandom: true },
 };
-const SOON = [['🎭', 'Мафія'], ['🂡', 'Тисяча'], ['🐐', 'Козел'], ['🎴', 'Свара']];
+const SOON = [['🂡', 'Тисяча'], ['🐐', 'Козел'], ['🎴', 'Свара']];
 
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }
 
@@ -112,6 +115,7 @@ function openGame(game) {
   $('hub').hidden = true; $('game').hidden = false;
   $('backBtn').hidden = false; $('rulesBtn').hidden = false;
   $('title').textContent = `${g.icon} ${g.title}`;
+  $('game').className = 'g-' + game;
   updStats(game);
   g.UI.mount($('game'), api);
   if (tg && tg.BackButton) tg.BackButton.show();
@@ -127,7 +131,7 @@ function showRules(game, back) {
 // ---------- setup ----------
 function showSetup(game) {
   const g = GAMES[game];
-  const cfg = Object.assign({ variant: 'podkidnoy', n: 2 }, pref('cfg.' + game, {}));
+  const cfg = Object.assign({ variant: 'podkidnoy', n: g.defP || 2 }, pref('cfg.' + game, {}));
   cfg.n = Math.min(Math.max(cfg.n, g.minP), g.maxP);
   const body = document.createElement('div');
   const chips = (label, opts, cur, pick) => {
@@ -153,7 +157,7 @@ function showSetup(game) {
     buttons: [
       { text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) },
       { text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) },
-      { text: '🎲 Випадковий суперник', fn: () => findMatch(game, c()) },
+      ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c()) }]),
       { text: '📖 Правила', sec: true, fn: () => showRules(game, () => showSetup(game)) },
       { text: 'Назад', sec: true, fn: hidePanel },
     ],
@@ -283,6 +287,7 @@ function showLobby(m) {
   const g = GAMES[m.game], me = m.you, isHost = m.host === me;
   const body = document.createElement('div');
   if (m.cfg.variant) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = m.cfg.variant === 'perevod' ? 'Переводний' : 'Підкидний'; body.appendChild(l); }
+  if (m.game === 'mafia') { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Від ${m.cfg.min} до ${m.cfg.max} гравців. Вільні місця можна заповнити ботами.`; body.appendChild(l); }
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {
     const li = document.createElement('li');
@@ -301,7 +306,11 @@ function showLobby(m) {
     const bots = m.seats.filter(s => s.bot).length;
     buttons.push({ text: '➕ Додати бота', sec: true, disabled: m.seats.length >= m.cfg.max, fn: () => netSend({ t: 'addBot' }) });
     if (bots) buttons.push({ text: '➖ Прибрати бота', sec: true, fn: () => netSend({ t: 'removeBot' }) });
-    buttons.push({ text: m.seats.length < 2 ? '▶ Почати (потрібно 2+)' : `▶ Почати гру (${m.seats.length})`, disabled: m.seats.length < 2, fn: () => netSend({ t: 'start' }) });
+    const min = m.cfg.min || 2;
+    if (m.seats.length < min && m.seats.length < m.cfg.max) {
+      buttons.push({ text: `🤖 Доповнити ботами до ${min}`, sec: true, fn: () => { for (let k = m.seats.length; k < min; k++) netSend({ t: 'addBot' }); } });
+    }
+    buttons.push({ text: m.seats.length < min ? `▶ Почати (потрібно ${min}+)` : `▶ Почати гру (${m.seats.length})`, disabled: m.seats.length < min, fn: () => netSend({ t: 'start' }) });
   }
   buttons.push({ text: 'Вийти', sec: true, fn: showHub });
   const hostName = m.seats[m.host] ? m.seats[m.host].name : '';

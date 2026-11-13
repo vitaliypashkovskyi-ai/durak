@@ -1,4 +1,4 @@
-# Ігри — Telegram Mini App (@DurenUA_bot)
+# Ігри — Telegram Mini App (@IgryUA_bot, раніше @DurenUA_bot)
 
 - **Дурень**: підкидний і переводний, 2–6 гравців.
 - **Морський бій**: 2–4 гравці.

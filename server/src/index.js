@@ -64,7 +64,14 @@ async function verifyTelegram(init, token) {
 }
 const clean = s => String(s || '').replace(/[<>&"]/g, '').trim().slice(0, 24) || 'Гравець';
 async function authenticate(msg, env) {
-  if (msg.init) return verifyTelegram(msg.init, env.BOT_TOKEN);
+  if (msg.init) {
+    // BOT_TOKEN_2 = @IgryUA_bot (current), BOT_TOKEN = @DurenUA_bot (old links keep working)
+    for (const token of [env.BOT_TOKEN_2, env.BOT_TOKEN]) {
+      const u = await verifyTelegram(msg.init, token);
+      if (u) return u;
+    }
+    return null;
+  }
   if (msg.guest && env.ALLOW_GUEST === '1') {
     const id = String(msg.guest.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
     if (id.length < 8) return null;

@@ -9,7 +9,7 @@ import * as mafiaUI from './mafia-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
-const APP_LINK = 'https://t.me/DurenUA_bot';   // bot's main Mini App: ?startapp=CODE
+const APP_LINK = 'https://t.me/IgryUA_bot';    // bot's main Mini App: ?startapp=CODE
 const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 
@@ -325,7 +325,7 @@ function inviteLink() { return inTelegram || !location.search.includes('server='
 function shareInvite() {
   if (!S || !S.code) return;
   const g = GAMES[S.game] || GAMES.durak;
-  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}\n(@DurenUA_bot → «Грати» → «Увійти за кодом»)`);
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}\n(@IgryUA_bot → «Грати» → «Увійти за кодом»)`);
   if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
 }
 function copyInvite() {

@@ -142,7 +142,9 @@ function leave() {
 }
 
 function showHub() {
+  const wasLocal = S && S.kind === 'local' && S.host && !S.host.G.over;
   leave(); hidePanel();
+  if (wasLocal) toast('Партію збережено — її можна продовжити');
   $('game').hidden = true; $('game').innerHTML = '';
   $('hub').hidden = false;
   $('backBtn').hidden = true; $('rulesBtn').hidden = true;
@@ -159,6 +161,15 @@ function showHub() {
     b.className = 'hubact main';
     b.textContent = `↩ Повернутися до кімнати ${last.code}`;
     b.onclick = () => joinRoom(last.code, null);
+    top.appendChild(b);
+  }
+  const saved = savedGame();
+  if (saved) {
+    const g = GAMES[saved.game], detail = savedDetail(saved);
+    const b = document.createElement('button');
+    b.className = 'hubact main';
+    b.textContent = `▶ Продовжити: ${g.icon} ${g.title}${detail ? ' · ' + detail : ''}`;
+    b.onclick = resumeLocal;
     top.appendChild(b);
   }
   const row0 = document.createElement('div');
@@ -309,19 +320,78 @@ function myName() {
   const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   return (u && u.first_name) || 'Ви';
 }
-function startLocal(game, cfg, n) {
-  leave(); hidePanel();
+function startLocal(game, cfg, n, force) {
+  const s = savedGame();
+  if (s && !force) {
+    const old = GAMES[s.game];
+    return showPanel({
+      kind: 'choice', icon: '💾', title: 'Є незакінчена партія',
+      text: `${old.icon} ${old.title}${savedDetail(s) ? ' · ' + savedDetail(s) : ''}\nЯкщо почати нову, вона пропаде.`,
+      buttons: [
+        { text: `▶ Продовжити ${old.title}`, fn: resumeLocal },
+        { text: 'Почати нову гру', sec: true, fn: () => startLocal(game, cfg, n, true) },
+        { text: 'Скасувати', sec: true, fn: hidePanel },
+      ],
+    });
+  }
   const g = GAMES[game];
   const players = [{ name: myName() }];
   for (let i = 1; i < n; i++) players.push({ name: BOT_NAMES[i - 1], bot: true });
   const G = g.E.create(cfg, players);
   G.num = ++localNum;
-  const host = new Host(g.E, G, { onChange: () => onView(g.E.view(G, 0)) });
+  runLocal(game, cfg, n, G);
+}
+
+// A game with bots, new or restored. It is saved on this device after every move.
+function runLocal(game, cfg, n, G) {
+  leave(); hidePanel();
+  const g = GAMES[game];
+  const host = new Host(g.E, G, {
+    onChange: () => {
+      onView(g.E.view(G, 0));
+      saveLocal(game, cfg, n, G);
+    },
+  });
   S = { kind: 'local', game, cfg, n, host, act: m => host.act(0, m) };
   levels.list = null;
   api.online = null;
   openGame(game);
   host.changed();
+}
+
+// ---------- saved game with bots ----------
+function saveLocal(game, cfg, n, G) {
+  if (G.over) return setPref('saved', null);
+  try { localStorage.setItem('games.saved', JSON.stringify({ game, cfg, n, G, at: Date.now() })); } catch (e) {}
+}
+// timers inside the game (phase deadlines, pauses between tricks) continue from where they stopped
+function shiftTimes(G, dt) {
+  for (const k of ['deadline', 'waitUntil', 'talkStart']) if (typeof G[k] === 'number' && G[k] > 1e12) G[k] += dt;
+  if (G.botNext) for (const k in G.botNext) G.botNext[k] += dt;
+  if (G.ask) for (const k in G.ask) if (G.ask[k]) G.ask[k].at += dt;
+  if (G.lastSay) for (const k in G.lastSay) G.lastSay[k] += dt;
+}
+function savedGame() {
+  const s = pref('saved', null);
+  return s && s.G && GAMES[s.game] && !s.G.over ? s : null;
+}
+function savedDetail(s) {
+  const G = s.G;
+  if (Array.isArray(G.rounds)) return `роздача ${G.round + 1}/${G.rounds.length}`;
+  if (G.deal) return `роздача ${G.deal}`;
+  if (G.game === 'durak') return `у колоді ${G.deck.length}`;
+  if (G.day) return `${G.phase === 'night' ? 'ніч' : 'день'} ${G.day}`;
+  return '';
+}
+function resumeLocal() {
+  const s = savedGame();
+  if (!s) return showHub();
+  const G = s.G;
+  shiftTimes(G, Date.now() - s.at);
+  G.ev = null;
+  localNum = Math.max(localNum, G.num || 0);
+  runLocal(s.game, s.cfg, s.n, G);
+  toast('Продовжуємо з того самого місця');
 }
 
 function onView(v) {

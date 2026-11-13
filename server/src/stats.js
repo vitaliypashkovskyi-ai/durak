@@ -6,7 +6,7 @@ const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w' };
 const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
   'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today'];
-const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = 10;
+const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
 
@@ -113,7 +113,7 @@ export class Stats {
   }
 
   // First visit: +10 once. A brand-new player who came by a friend's link gets +5 more and the
-  // friend +15 (at most 10 friends a day per inviter).
+  // friend +15 for every new player, without a daily cap.
   hello(id, name, ref) {
     if (!/^tg:\d+$/.test(String(id))) return { ok: false };
     const existed = this.sql.exec('SELECT welcome_done FROM players WHERE id = ?', id).toArray()[0];

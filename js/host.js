@@ -41,6 +41,11 @@ export class Host {
       }, e.delay.bot);
       return;
     }
+    // bots that want to act later (e.g. talk in the chat on their own schedule)
+    if (e.botWakeIn) {
+      const ms = e.botWakeIn(G);
+      if (ms != null) { this.t = setTimeout(() => this.schedule(), ms); return; }
+    }
     if (this.idleMs) {
       const w = e.waiting(G).filter(i => !G.players[i].bot);
       if (!w.length) return;

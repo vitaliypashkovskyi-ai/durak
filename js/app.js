@@ -25,7 +25,7 @@ const GAMES = {
   mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7, noRandom: true },
 };
 GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3, noRandom: true };
-GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, noRandom: true, noBots: true };
+GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, defP: 5, noRandom: true };
 const SOON = [['🐐', 'Козел'], ['🎴', 'Свара'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
 
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }

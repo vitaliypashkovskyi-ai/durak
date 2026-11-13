@@ -65,7 +65,7 @@ async function verifyTelegram(init, token) {
 const clean = s => String(s || '').replace(/[<>&"]/g, '').trim().slice(0, 24) || 'Гравець';
 async function authenticate(msg, env) {
   if (msg.init) {
-    // BOT_TOKEN_2 = @IgryUA_bot (current), BOT_TOKEN = @DurenUA_bot (old links keep working)
+    // BOT_TOKEN_2 = @IgryUA_bot. BOT_TOKEN (old @DurenUA_bot) was deleted with that bot; unset secrets are skipped.
     for (const token of [env.BOT_TOKEN_2, env.BOT_TOKEN]) {
       const u = await verifyTelegram(msg.init, token);
       if (u) return u;

@@ -40,6 +40,7 @@ function leave() {
   clearInterval(waitTimer);
   if (!S) return;
   const s = S; S = null; overShown = null; NETGEN++;
+  if (s.kind === 'online') setPref('lastRoom', null);   // left on purpose: nothing to come back to
   if (s.host) s.host.stop();
   if (s.ws) {
     try { if (s.ws.readyState === 1 && s.kind === 'online') s.ws.send(JSON.stringify({ t: 'leave' })); s.ws.close(1000); } catch (e) {}
@@ -55,7 +56,21 @@ function showHub() {
   $('stats').textContent = '';
   if (tg && tg.BackButton) tg.BackButton.hide();
   const h = $('hub');
-  h.innerHTML = '<div class="hubhead">Оберіть гру</div><div class="hubgrid"></div>';
+  h.innerHTML = '<div class="hubtop"></div><div class="hubhead">Оберіть гру</div><div class="hubgrid"></div>';
+  const top = h.querySelector('.hubtop');
+  const last = pref('lastRoom', null);
+  if (last && Date.now() - last.t < 6 * 3600 * 1000) {
+    const b = document.createElement('button');
+    b.className = 'hubact main';
+    b.textContent = `↩ Повернутися до кімнати ${last.code}`;
+    b.onclick = () => joinRoom(last.code, null);
+    top.appendChild(b);
+  }
+  const codeBtn = document.createElement('button');
+  codeBtn.className = 'hubact';
+  codeBtn.textContent = '🔑 Увійти за кодом кімнати';
+  codeBtn.onclick = askCode;
+  top.appendChild(codeBtn);
   const grid = h.querySelector('.hubgrid');
   for (const [id, g] of Object.entries(GAMES)) {
     const b = document.createElement('button');
@@ -70,6 +85,26 @@ function showHub() {
     d.innerHTML = `<span class="ic">${ic}</span><b>${t}</b><small>скоро</small>`;
     grid.appendChild(d);
   }
+}
+
+function askCode() {
+  const body = document.createElement('div');
+  const input = document.createElement('input');
+  input.className = 'codein';
+  input.maxLength = 8;
+  input.placeholder = 'КОД';
+  input.autocapitalize = 'characters';
+  input.autocomplete = 'off';
+  body.appendChild(input);
+  const go = () => {
+    const code = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!/^[A-Z0-9]{4,8}$/.test(code)) { toast('Код — це 6 літер і цифр'); input.focus(); return; }
+    joinRoom(code, null);
+  };
+  input.onkeydown = e => { if (e.key === 'Enter') go(); };
+  showPanel({ kind: 'code', icon: '🔑', title: 'Код кімнати', text: 'Введіть код, який вам надіслав друг.', body, buttons: [
+    { text: 'Увійти', fn: go }, { text: 'Скасувати', sec: true, fn: hidePanel }] });
+  setTimeout(() => input.focus(), 50);
 }
 
 function openGame(game) {
@@ -232,8 +267,10 @@ function joinRoom(code, create) {
 function onRoomMsg(m) {
   if (!S || S.kind !== 'online') return;
   if (m.type === 'error') {
+    setPref('lastRoom', null);
     return showPanel({ kind: 'error', icon: '😕', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] });
   }
+  if (m.type === 'lobby' || m.type === 'state') setPref('lastRoom', { code: S.code, game: m.game, t: Date.now() });
   if (m.type === 'lobby') { S.game = m.game; return showLobby(m); }
   if (m.type !== 'state') return;
   if (!S.mounted || S.game !== m.game) { S.game = m.game; S.mounted = true; openGame(m.game); }
@@ -249,7 +286,7 @@ function showLobby(m) {
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {
     const li = document.createElement('li');
-    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${i === me ? ' (ви)' : ''}${i === m.host ? ' 👑' : ''}`;
+    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${i === me ? ' (ви)' : ''}${i === m.host ? ' 👑' : ''}${s.online ? '' : ' 📴'}`;
     ul.appendChild(li);
   });
   for (let i = m.seats.length; i < m.cfg.max; i++) {
@@ -270,7 +307,8 @@ function showLobby(m) {
   const hostName = m.seats[m.host] ? m.seats[m.host].name : '';
   showPanel({
     kind: 'lobby', icon: g.icon, title: `${g.title}: кімната`, code: S.code, body, buttons,
-    text: isHost ? 'Запросіть друзів або додайте ботів, потім почніть гру.' : `Чекаємо, поки ${hostName} почне гру.`,
+    text: (isHost ? 'Запросіть друзів або додайте ботів, потім почніть гру.' : `Чекаємо, поки ${hostName} почне гру.`) +
+      '\nДруг може відкрити посилання або ввести цей код: бот → «Грати» → «Увійти за кодом».',
   });
 }
 
@@ -278,7 +316,7 @@ function inviteLink() { return inTelegram || !location.search.includes('server='
 function shareInvite() {
   if (!S || !S.code) return;
   const g = GAMES[S.game] || GAMES.durak;
-  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}!`);
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}\n(@DurenUA_bot → «Грати» → «Увійти за кодом»)`);
   if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
 }
 function copyInvite() {

@@ -13,6 +13,7 @@ const MAX = { durak: 6, battle: 4 };
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан'];
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
 const LEFT_MS = 60000;       // a human offline for this long is replaced by a bot
+const LOBBY_KEEP_MS = 180000; // before the start, an offline player keeps the seat this long
 const CORS = { 'Access-Control-Allow-Origin': '*' };
 
 export default {
@@ -179,9 +180,10 @@ export class Room {
   onClose(s, ws) {
     if (s.ws !== ws) return;
     s.ws = null;
-    if (!this.G) {                   // lobby: the seat is freed
-      this.seats.splice(this.seats.indexOf(s), 1);
-      this.fixHost();
+    if (!this.G) {
+      // lobby: keep the seat for a while — Telegram often closes the app while the host shares the invite
+      clearTimeout(this.timers.get(s.id));
+      this.timers.set(s.id, setTimeout(() => { if (!s.ws && !this.G) this.removeSeat(s); }, LOBBY_KEEP_MS));
       return this.broadcast();
     }
     if (s.id === this.hostId) this.fixHost();
@@ -189,6 +191,15 @@ export class Room {
     if (this.G.over || s.bot) return;
     clearTimeout(this.timers.get(s.id));
     this.timers.set(s.id, setTimeout(() => { if (!s.ws) this.toBot(s); }, LEFT_MS));
+  }
+
+  removeSeat(s) {
+    const i = this.seats.indexOf(s);
+    if (i < 0) return;
+    this.seats.splice(i, 1);
+    clearTimeout(this.timers.get(s.id));
+    this.fixHost();
+    this.broadcast();
   }
 
   toBot(s) {
@@ -227,7 +238,8 @@ export class Room {
     const i = this.seats.indexOf(s);
     if (i < 0) return;
     if (m.t === 'leave') {
-      if (this.G && !this.G.over) this.toBot(s);
+      if (!this.G) this.removeSeat(s);
+      else if (!this.G.over) this.toBot(s);
       return;
     }
     if (!this.G) {                   // lobby commands (host only)

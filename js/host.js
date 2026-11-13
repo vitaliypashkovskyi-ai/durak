@@ -7,7 +7,7 @@ export class Host {
     this.e = engine; this.G = G; this.onChange = onChange; this.idleMs = idleMs;
     this.t = null; this.stuck = new Set(); this.stopped = false;
   }
-  stop() { this.stopped = true; clearTimeout(this.t); }
+  stop() { this.stopped = true; clearTimeout(this.t); clearTimeout(this.ta); }
   changed() {
     if (this.stopped) return;
     this.stuck.clear();
@@ -22,12 +22,14 @@ export class Host {
     return ok;
   }
   schedule() {
-    clearTimeout(this.t);
+    clearTimeout(this.t); clearTimeout(this.ta);
     const G = this.G, e = this.e;
     if (this.stopped || G.over) return;
     if (e.pendingAdvance(G)) {
-      this.t = setTimeout(() => { e.advance(G); this.changed(); }, e.delay.advance);
-      return;
+      // timed games (advanceIn) keep letting bots act until the phase timer fires
+      const ms = e.advanceIn ? Math.max(0, e.advanceIn(G)) : e.delay.advance;
+      this.ta = setTimeout(() => { e.advance(G); this.changed(); }, ms);
+      if (!e.advanceIn) return;
     }
     for (let i = 0; i < G.players.length; i++) {
       if (!G.players[i].bot || this.stuck.has(i)) continue;

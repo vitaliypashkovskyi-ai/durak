@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="uk">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Ігри</title>
+<title>Ð†Ð³Ñ€Ð¸</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -23,6 +23,10 @@ header h1 span{color:var(--gold)}
 
 /* hub */
 #hub{flex:1;overflow:auto;padding:8px 14px 20px}
+.hubtop{display:flex;flex-direction:column;gap:8px;max-width:520px;margin:0 auto 6px}
+.hubact{border:0;border-radius:12px;padding:11px 14px;font-size:15px;font-weight:600;color:#fff;background:rgba(255,255,255,.14);cursor:pointer}
+.hubact.main{background:var(--blue)}
+.codein{width:100%;font:700 28px ui-monospace,Consolas,monospace;letter-spacing:6px;text-align:center;text-transform:uppercase;padding:10px;border:2px solid #ddd;border-radius:12px;margin-top:8px;user-select:text;-webkit-user-select:text}
 .hubhead{font-size:14px;color:var(--muted);margin:4px 0 12px;text-align:center}
 .hubgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:520px;margin:0 auto}
 .gcard{background:rgba(255,255,255,.1);border:0;border-radius:16px;padding:18px 10px;color:#fff;text-align:center;cursor:pointer;font:inherit}
@@ -100,11 +104,11 @@ header h1 span{color:var(--gold)}
 .grid.big .cell{font-size:15px}
 .cell.ship{background:#a7b2bb}
 .cell.miss{background:#1d5684}
-.cell.miss::after{content:"•";color:#cfe3f5}
+.cell.miss::after{content:"â€¢";color:#cfe3f5}
 .cell.hit{background:#e0533d}
-.cell.hit::after{content:"✕"}
+.cell.hit::after{content:"âœ•"}
 .cell.sunk{background:#6b1d14}
-.cell.sunk::after{content:"✕";color:#ffb4a8}
+.cell.sunk::after{content:"âœ•";color:#ffb4a8}
 .grid.aim .cell.free{cursor:pointer}
 .grid.aim{box-shadow:0 0 0 2px var(--gold)}
 .brow{display:flex;gap:10px;justify-content:center;min-height:8px}
@@ -138,16 +142,16 @@ header h1 span{color:var(--gold)}
 <body>
 <div id="app">
   <header>
-    <button class="hbtn" id="backBtn" hidden aria-label="Назад">←</button>
-    <h1 id="title">Ігри <span>♦</span></h1>
+    <button class="hbtn" id="backBtn" hidden aria-label="ÐÐ°Ð·Ð°Ð´">â†</button>
+    <h1 id="title">Ð†Ð³Ñ€Ð¸ <span>â™¦</span></h1>
     <span class="stat" id="stats"></span>
-    <button class="hbtn" id="rulesBtn" hidden aria-label="Правила">?</button>
+    <button class="hbtn" id="rulesBtn" hidden aria-label="ÐŸÑ€Ð°Ð²Ð¸Ð»Ð°">?</button>
   </header>
   <section id="hub"></section>
   <section id="game" hidden></section>
 </div>
 <div id="toast"></div>
 <div class="overlay" id="ov" hidden><div class="panel" id="ovPanel"></div></div>
-<script type="module" src="js/app.js?v=4"></script>
+<script type="module" src="js/app.js?v=5"></script>
 </body>
 </html>

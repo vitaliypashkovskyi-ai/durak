@@ -2,6 +2,7 @@
 import * as durak from '../js/durak-engine.js';
 import * as battle from '../js/battle-engine.js';
 import * as mafia from '../js/mafia-engine.js';
+import * as thousand from '../js/thousand-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -64,5 +65,26 @@ const mafiaCheck = G => {
 for (let n = 5; n <= 12; n++) {
   const r = run(mafia, {}, n, 300, mafiaCheck);
   console.log(`mafia n=${n}: ${r.games} games, avg ${Math.round(r.steps / r.games)} steps, winners`, r.outcomes);
+}
+{
+  let deals = 0, made = 0, contracts = 0, marriagesSeen = 0;
+  const thStats = {};
+  const thCheck = G => {
+    const cards = G.hands.flat().length + G.talon.length + G.trick.length;
+    if (G.phase === 'bid' && cards !== 24) throw new Error('thousand card count ' + cards);
+    const ids = new Set(G.hands.flat().map(c => c.id));
+    if (ids.size !== G.hands.flat().length) throw new Error('duplicate card');
+    if (G.phase === 'score' && G.result && G.result.__seen !== true) {
+      G.result.__seen = true; deals++; contracts += G.contract;
+      if (G.result[G.declarer].made) made++;
+      const key = G.contract === 100 ? 'c100' : 'cMore';
+      thStats[key] = thStats[key] || [0, 0]; thStats[key][0]++; if (G.result[G.declarer].made) thStats[key][1]++;
+      marriagesSeen += G.marr.filter(Boolean).length;
+      const pts = G.taken.reduce((a, b) => a + b, 0);
+      if (pts !== 120) throw new Error('trick points ' + pts);
+    }
+  };
+  const r = run(thousand, {}, 3, 100, thCheck);
+  console.log(`thousand: ${r.games} games, avg ${Math.round(deals / r.games)} deals, contracts made ${Math.round(100 * made / deals)}%, avg contract ${Math.round(contracts / deals)}, marriages ${marriagesSeen}, winners`, r.outcomes, 'made by contract [deals, made]:', JSON.stringify(thStats));
 }
 console.log('OK');

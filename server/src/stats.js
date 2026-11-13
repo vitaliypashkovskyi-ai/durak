@@ -3,7 +3,7 @@
 import { tg, CHANNEL, topText } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
-const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w' };
+const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w' };
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
 
@@ -17,6 +17,7 @@ export function badges(p) {
   const b = [];
   if (p.durak_w >= 15) b.push('🃏 Шулер');
   if (p.battle_w >= 15) b.push('⚓ Адмірал');
+  if (p.thousand_w >= 5) b.push('🂡 Тисячник');
   if (p.don_w >= 5) b.push('🎭 Дон мафії');
   if (p.mafia_w - p.don_w >= 15) b.push('🏙 Захисник міста');
   return b;
@@ -31,6 +32,8 @@ export class Stats {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, name TEXT, points INTEGER DEFAULT 0,
       games INTEGER DEFAULT 0, wins INTEGER DEFAULT 0, durak_w INTEGER DEFAULT 0, battle_w INTEGER DEFAULT 0,
       mafia_w INTEGER DEFAULT 0, don_w INTEGER DEFAULT 0)`);
+    const cols = this.sql.exec('PRAGMA table_info(players)').toArray().map(c => c.name);
+    if (!cols.includes('thousand_w')) this.sql.exec('ALTER TABLE players ADD COLUMN thousand_w INTEGER DEFAULT 0');
     this.sql.exec('CREATE TABLE IF NOT EXISTS results(id TEXT, game TEXT, res TEXT, pts INTEGER, ts INTEGER)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS results_ts ON results(ts)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)');

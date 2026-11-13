@@ -9,6 +9,7 @@ export const GAMES = {
   durak: { icon: '🃏', title: 'Дурень' },
   battle: { icon: '🚢', title: 'Морський бій' },
   mafia: { icon: '🎭', title: 'Мафія' },
+  thousand: { icon: '🂡', title: 'Тисяча' },
 };
 export const joinUrl = code => `https://t.me/${BOT}?startapp=${code}`;
 
@@ -40,7 +41,7 @@ export function topText(rows, title) {
 }
 
 // ---------- webhook ----------
-const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia' };
+const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand' };
 
 export async function handleUpdate(update, env, makeRoom) {
   if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
@@ -54,7 +55,8 @@ const menuKeyboard = withPlay => ({
   inline_keyboard: [
     ...(withPlay ? [[{ text: '🎮 Відкрити ігри', web_app: { url: APP_URL } }]] : []),
     [{ text: '🃏 Дурень', callback_data: 'new:durak' }, { text: '🚢 Морський бій', callback_data: 'new:battle' }],
-    [{ text: '🎭 Мафія', callback_data: 'new:mafia' }, { text: '🏆 Топ тижня', callback_data: 'top' }],
+    [{ text: '🎭 Мафія', callback_data: 'new:mafia' }, { text: '🂡 Тисяча', callback_data: 'new:thousand' }],
+    [{ text: '🏆 Топ тижня', callback_data: 'top' }],
   ],
 });
 const MENU_TEXT = '🎲 <b>Ігри UA</b> — оберіть гру, і бот збере кімнату. Хто натисне «Приєднатися», зайде до вас.';

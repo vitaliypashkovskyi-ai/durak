@@ -7,14 +7,15 @@
 import * as durak from '../../js/durak-engine.js';
 import * as battle from '../../js/battle-engine.js';
 import * as mafia from '../../js/mafia-engine.js';
+import * as thousand from '../../js/thousand-engine.js';
 import { Host } from '../../js/host.js';
 import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia };
-const MIN = { durak: 2, battle: 2, mafia: 5 };
-const MAX = { durak: 6, battle: 4, mafia: 12 };   // durak: depends on the deck, see roomConfig
-const NO_RANDOM = new Set(['mafia']);
+const ENGINES = { durak, battle, mafia, thousand };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3 };   // durak: depends on the deck, see roomConfig
+const NO_RANDOM = new Set(['mafia', 'thousand']);
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
 const LEFT_MS = 60000;       // a human offline for this long is replaced by a bot
@@ -354,7 +355,7 @@ export class Room {
       if (s.botOnly || s.bot || !s.id.startsWith('tg:')) return;
       let res, don = false;
       if (G.game === 'durak') res = G.loser === -1 ? 'draw' : G.loser === i ? 'lose' : 'win';
-      else if (G.game === 'battle') res = G.winner === i ? 'win' : 'lose';
+      else if (G.game === 'battle' || G.game === 'thousand') res = G.winner === i ? 'win' : 'lose';
       else if (G.game === 'mafia') {
         const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
         res = G.winner === team ? 'win' : 'lose';

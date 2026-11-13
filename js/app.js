@@ -6,6 +6,8 @@ import * as durakUI from './durak-ui.js';
 import * as battleUI from './battle-ui.js';
 import * as mafiaE from './mafia-engine.js';
 import * as mafiaUI from './mafia-ui.js';
+import * as thousandE from './thousand-engine.js';
+import * as thousandUI from './thousand-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -20,7 +22,8 @@ const GAMES = {
   battle: { title: 'Морський бій', icon: '🚢', sub: '2–4 гравці', E: battleE, UI: battleUI, minP: 2, maxP: 4 },
   mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7, noRandom: true },
 };
-const SOON = [['🂡', 'Тисяча'], ['🐐', 'Козел'], ['🎴', 'Свара']];
+GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3, noRandom: true };
+const SOON = [['🐐', 'Козел'], ['🎴', 'Свара']];
 
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }
 
@@ -33,7 +36,8 @@ function stat(game) {
   return s && typeof s.win === 'number' ? s : { win: 0, lose: 0, draw: 0 };
 }
 function addStat(game, res) { const s = stat(game); s[res] = (s[res] || 0) + 1; setPref('stats.' + game, s); }
-function updStats(game) { const s = stat(game); $('stats').textContent = `🏆 ${s.win} · ${game === 'durak' ? '🙃' : '⚓'} ${s.lose}`; }
+const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉' };
+function updStats(game) { const s = stat(game); $('stats').textContent = `🏆 ${s.win} · ${LOSE_ICON[game] || '✖'} ${s.lose}`; }
 
 // ---------- session ----------
 let S = null;           // {kind:'local'|'online'|'match', game, act(m)}
@@ -173,7 +177,7 @@ function showSetup(game) {
   }
   const ns = [];
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
-  chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
+  if (ns.length > 1) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   const s = stat(game);
   const c = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) } : {});
   showPanel({

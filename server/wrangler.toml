@@ -14,8 +14,20 @@ class_name = "Room"
 name = "LOBBY"
 class_name = "Lobby"
 
+[[durable_objects.bindings]]
+name = "STATS"
+class_name = "Stats"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room", "Lobby"]
 
-# BOT_TOKEN is a secret: npx wrangler secret put BOT_TOKEN
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Stats"]
+
+# weekly top-10 in the news channel: Sunday 17:00 UTC (19:00 Kyiv in winter)
+[triggers]
+crons = ["0 17 * * SUN"]
+
+# secrets (npx wrangler secret put …): BOT_TOKEN_2 = @IgryUA_bot token, WEBHOOK_SECRET = Telegram webhook secret

@@ -87,6 +87,11 @@ function showHub() {
     row.appendChild(b);
   }
   top.appendChild(row);
+  const rateBtn = document.createElement('button');
+  rateBtn.className = 'hubact';
+  rateBtn.textContent = '🏆 Рейтинг гравців';
+  rateBtn.onclick = () => showRating('week');
+  top.appendChild(rateBtn);
   const grid = h.querySelector('.hubgrid');
   for (const [id, g] of Object.entries(GAMES)) {
     const b = document.createElement('button');
@@ -239,6 +244,53 @@ let GID = null;
 const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPH[b % ALPH.length]).join('');
 const serverBase = () => new URLSearchParams(location.search).get('server') || SERVER;
+const httpBase = () => serverBase().replace(/^ws/, 'http');
+
+// ---------- rating ----------
+async function showRating(period) {
+  showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  let top = [], me = null;
+  try {
+    top = await (await fetch(`${httpBase()}/api/top?period=${period}`)).json();
+    if (inTelegram) {
+      const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) });
+      if (r.ok) me = await r.json();
+    }
+  } catch (e) {
+    return showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', text: 'Не вдалося завантажити. Перевірте інтернет.', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  }
+  if (panelKind() !== 'rating') return;
+  const body = document.createElement('div');
+  const add = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = text; body.appendChild(e); return e; };
+  if (me) {
+    const box = document.createElement('div'); box.className = 'mecard';
+    const line = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; box.appendChild(d); };
+    line(me.level.name, 'lvl');
+    line(`${me.points} очок · ${me.wins} перемог з ${me.games}` + (me.rank ? ` · місце ${me.rank}` : ''));
+    line(`Цього тижня: ${me.week} очок`);
+    if (me.level.next) line(`До «${me.level.next.name}»: ще ${me.level.next.at - me.points} очок`, 'sub');
+    if (me.badges.length) line(me.badges.join(' · '), 'badges');
+    body.appendChild(box);
+  } else if (!inTelegram) {
+    add('p', 'muted', 'Свої очки побачите, коли відкриєте гру в Telegram (@IgryUA_bot).');
+  }
+  const tabs = document.createElement('div'); tabs.className = 'chips';
+  for (const [p, t] of [['week', 'Цього тижня'], ['all', 'За весь час']]) {
+    const b = document.createElement('button'); b.className = 'chip' + (p === period ? ' on' : ''); b.textContent = t;
+    b.onclick = () => showRating(p); tabs.appendChild(b);
+  }
+  body.appendChild(tabs);
+  const ol = document.createElement('ol'); ol.className = 'plist top';
+  if (!top.length) { const li = document.createElement('li'); li.className = 'free'; li.textContent = 'Поки порожньо — зіграйте онлайн з друзями!'; ol.appendChild(li); }
+  top.forEach((r, i) => {
+    const li = document.createElement('li');
+    li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name} — ${r.points} оч.`;
+    ol.appendChild(li);
+  });
+  body.appendChild(ol);
+  add('p', 'muted', 'Очки: перемога +3, нічия +1. Рахуються онлайн-ігри, де грають щонайменше двоє людей.');
+  showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', body, buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+}
 
 function hello(extra) {
   if (inTelegram) return Object.assign({ t: 'hello', init: tg.initData }, extra);
@@ -289,6 +341,7 @@ function joinRoom(code, create) {
 
 function onRoomMsg(m) {
   if (!S || S.kind !== 'online') return;
+  if (m.type === 'toast') return toast(m.text);
   if (m.type === 'error') {
     setPref('lastRoom', null);
     return showPanel({ kind: 'error', icon: '😕', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] });
@@ -331,6 +384,7 @@ function showLobby(m) {
     }
     buttons.push({ text: m.seats.length < min ? `▶ Почати (потрібно ${min}+)` : `▶ Почати гру (${m.seats.length})`, disabled: m.seats.length < min, fn: () => netSend({ t: 'start' }) });
   }
+  if (m.seats.length < m.cfg.max) buttons.push({ text: '📣 Шукаю гравців у чаті', sec: true, fn: () => netSend({ t: 'advertise' }) });
   buttons.push({ text: 'Вийти', sec: true, fn: showHub });
   const hostName = m.seats[m.host] ? m.seats[m.host].name : '';
   showPanel({

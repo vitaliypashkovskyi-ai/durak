@@ -8,6 +8,8 @@ import * as durak from '../../js/durak-engine.js';
 import * as battle from '../../js/battle-engine.js';
 import * as mafia from '../../js/mafia-engine.js';
 import { Host } from '../../js/host.js';
+import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES } from './telegram.js';
+export { Stats } from './stats.js';
 
 const ENGINES = { durak, battle, mafia };
 const MIN = { durak: 2, battle: 2, mafia: 5 };
@@ -17,12 +19,35 @@ const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія',
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
 const LEFT_MS = 60000;       // a human offline for this long is replaced by a bot
 const LOBBY_KEEP_MS = 180000; // before the start, an offline player keeps the seat this long
-const CORS = { 'Access-Control-Allow-Origin': '*' };
+const ADVERTISE_MS = 60000;  // one «looking for players» post per room per minute
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
+const json = (d, status = 200) => new Response(JSON.stringify(d), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+
+// A room prepared by the server (group command): the first player to open the link becomes the host.
+async function makeRoom(env, create) {
+  const code = genCode();
+  await env.ROOM.get(env.ROOM.idFromName(code)).fetch(`https://room/init?room=${code}`, { method: 'POST', body: JSON.stringify({ create }) });
+  return code;
+}
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (url.pathname === '/health') return new Response('ok', { headers: CORS });
+    if (url.pathname === '/tg/hook') {
+      if (!env.WEBHOOK_SECRET || req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.WEBHOOK_SECRET) return new Response('forbidden', { status: 403 });
+      const update = await req.json();
+      ctx.waitUntil(handleUpdate(update, env, create => makeRoom(env, create)).catch(e => console.log('update failed', e && e.message)));
+      return new Response('ok');
+    }
+    if (url.pathname === '/api/top') return json(await statsCall(env, '/top?period=' + (url.searchParams.get('period') === 'week' ? 'week' : 'all')));
+    if (url.pathname === '/api/profile' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user) return json({ error: 'not telegram' }, 401);
+      return json(await statsCall(env, '/profile', { id: user.id }));
+    }
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('Ігри server', { headers: CORS });
     if (url.pathname === '/ws/match') {
       const game = url.searchParams.get('game') || 'durak';
@@ -37,6 +62,10 @@ export default {
       return env.ROOM.get(env.ROOM.idFromName(code)).fetch(req);
     }
     return new Response('not found', { status: 404 });
+  },
+  // weekly top in the news channel (cron in wrangler.toml)
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(statsCall(env, '/weekly', {}));
   },
 };
 
@@ -142,8 +171,11 @@ function roomConfig(c) {
 
 export class Room {
   constructor(state, env) {
+    this.state = state;
     this.env = env;
     this.cfg = null;
+    this.reported = 0;
+    this.advertisedAt = 0;
     this.seats = [];          // {id, name, ws, bot, botOnly}
     this.hostId = null;
     this.G = null;
@@ -152,7 +184,18 @@ export class Room {
     this.again = new Set();
     this.timers = new Map();
   }
-  async fetch() { return acceptWithHello(this.env, (ws, user, msg) => this.join(ws, user, msg.create)); }
+  async fetch(req) {
+    // the config is stored so a room prepared from a group command survives until someone opens it
+    if (!this.cfg) this.cfg = (await this.state.storage.get('cfg')) || null;
+    const url = new URL(req.url);
+    if (url.searchParams.get('room')) this.code = url.searchParams.get('room').toUpperCase();
+    if (url.pathname === '/init') {
+      const { create } = await req.json();
+      if (!this.cfg) { this.cfg = roomConfig(create); await this.state.storage.put('cfg', this.cfg); }
+      return new Response('ok');
+    }
+    return acceptWithHello(this.env, (ws, user, msg) => this.join(ws, user, msg.create));
+  }
 
   humans() { return this.seats.filter(s => !s.botOnly); }
   fixHost() {
@@ -168,6 +211,7 @@ export class Room {
       const cfg = roomConfig(create);
       if (!cfg) return fail(ws, 'Кімнату не знайдено або гра вже закінчилась. Попросіть нове посилання.', 4004);
       this.cfg = cfg;
+      this.state.storage.put('cfg', cfg);
     }
     let s = this.seats.find(x => !x.botOnly && x.id === user.id);
     if (!s) {
@@ -233,7 +277,7 @@ export class Room {
     this.G = E.create(this.cfg, this.seats.map(s => ({ name: s.name, bot: s.bot || s.botOnly })));
     this.G.num = this.num;
     this.again.clear();
-    this.host = new Host(E, this.G, { onChange: () => this.broadcast(), idleMs: IDLE_MS });
+    this.host = new Host(E, this.G, { onChange: () => { this.broadcast(); this.report(); }, idleMs: IDLE_MS });
     this.host.changed();
   }
 
@@ -257,6 +301,7 @@ export class Room {
       else if (!this.G.over) this.toBot(s);
       return;
     }
+    if (m.t === 'advertise') return this.advertise(s);
     if (!this.G) {                   // lobby commands (host only)
       if (s.id !== this.hostId) return;
       if (m.t === 'addBot' && this.seats.length < this.cfg.max) {
@@ -298,4 +343,47 @@ export class Room {
     return v;
   }
   broadcast() { this.seats.forEach((s, i) => { if (s.ws) send(s.ws, this.view(i)); }); }
+
+  // Rating: only games with at least two Telegram players count (no farming against bots).
+  report() {
+    const G = this.G;
+    if (!G || !G.over || this.reported === G.num) return;
+    this.reported = G.num;
+    const players = [];
+    this.seats.forEach((s, i) => {
+      if (s.botOnly || s.bot || !s.id.startsWith('tg:')) return;
+      let res, don = false;
+      if (G.game === 'durak') res = G.loser === -1 ? 'draw' : G.loser === i ? 'lose' : 'win';
+      else if (G.game === 'battle') res = G.winner === i ? 'win' : 'lose';
+      else if (G.game === 'mafia') {
+        const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
+        res = G.winner === team ? 'win' : 'lose';
+        don = team === 'mafia';
+      } else return;
+      players.push({ id: s.id, name: s.name, res, don });
+    });
+    if (players.length < 2) return;
+    this.state.waitUntil(statsCall(this.env, '/report', { game: G.game, players }).catch(() => {}));
+  }
+
+  // «Шукаю гравців у чаті»: post the room to the players' chat with a join button.
+  async advertise(s) {
+    const toast = text => s.ws && send(s.ws, { type: 'toast', text });
+    if (this.G) return toast('Гра вже почалася');
+    if (Date.now() - this.advertisedAt < ADVERTISE_MS) return toast('Оголошення вже надіслано — зачекайте хвилину');
+    this.advertisedAt = Date.now();
+    const { groupId } = await statsCall(this.env, '/community');
+    if (!groupId) { this.advertisedAt = 0; return toast('Чат гравців ще не підключено'); }
+    const g = GAMES[this.cfg.game], code = this.code;
+    const label = cfgLabel(this.cfg);
+    const host = this.seats.find(x => x.id === this.hostId);
+    const text = `${g.icon} <b>${esc(host ? host.name : s.name)}</b> збирає гру «${g.title}»${label ? ` (${esc(label)})` : ''}\n` +
+      `Гравців: ${this.seats.length}/${this.cfg.max}${this.cfg.min > 2 ? `, потрібно щонайменше ${this.cfg.min}` : ''}. Заходьте! 👇`;
+    const r = await tg(this.env, 'sendMessage', {
+      chat_id: groupId, text, parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '▶ Приєднатися', url: joinUrl(code) }]] },
+    });
+    if (!r.ok) { this.advertisedAt = 0; return toast(r.description && r.description.includes('not a member') ? 'Бота ще не додано в чат гравців' : 'Не вдалося надіслати оголошення'); }
+    toast('📣 Оголошення надіслано в чат гравців');
+  }
 }

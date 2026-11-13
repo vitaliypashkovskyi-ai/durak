@@ -11,7 +11,8 @@ import { Host } from './host.js';
 const SERVER = 'wss://durak.durak-server.workers.dev';
 const APP_LINK = 'https://t.me/IgryUA_bot';    // bot's main Mini App: ?startapp=CODE
 const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
-const COMMUNITY = 'https://t.me/UAIgry';   // players' channel
+const COMMUNITY = 'https://t.me/UAIgry';                 // news channel
+const CHAT = 'https://t.me/+WT_01Sm-EfllM2E6';           // players' chat (group)
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 
 const GAMES = {
@@ -75,13 +76,17 @@ function showHub() {
   codeBtn.textContent = '🔑 Увійти за кодом кімнати';
   codeBtn.onclick = askCode;
   top.appendChild(codeBtn);
-  const commBtn = document.createElement('button');
-  commBtn.className = 'hubact';
-  commBtn.textContent = '💬 Спільнота гравців';
-  commBtn.onclick = () => {
-    if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(COMMUNITY); else window.open(COMMUNITY, '_blank');
-  };
-  top.appendChild(commBtn);
+  const open = url => { if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); };
+  const row = document.createElement('div');
+  row.className = 'hubrow';
+  for (const [text, url] of [['💬 Чат гравців', CHAT], ['📢 Новини', COMMUNITY]]) {
+    const b = document.createElement('button');
+    b.className = 'hubact';
+    b.textContent = text;
+    b.onclick = () => open(url);
+    row.appendChild(b);
+  }
+  top.appendChild(row);
   const grid = h.querySelector('.hubgrid');
   for (const [id, g] of Object.entries(GAMES)) {
     const b = document.createElement('button');

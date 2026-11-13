@@ -12,6 +12,7 @@ export const GAMES = {
   thousand: { icon: '🂡', title: 'Тисяча' },
   spy: { icon: '🕵️', title: 'Шпигун' },
   goat: { icon: '🐐', title: 'Козел' },
+  rpoker: { icon: '🎯', title: 'Розписний покер' },
 };
 export const joinUrl = code => `https://t.me/${BOT}?startapp=${code}`;
 
@@ -43,7 +44,7 @@ export function topText(rows, title) {
 }
 
 // ---------- webhook ----------
-const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand', '/spy': 'spy', '/kozel': 'goat' };
+const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand', '/spy': 'spy', '/kozel': 'goat', '/poker': 'rpoker' };
 
 export async function handleUpdate(update, env, makeRoom) {
   if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
@@ -59,7 +60,7 @@ const menuKeyboard = withPlay => ({
     [{ text: '🃏 Дурень', callback_data: 'new:durak' }, { text: '🚢 Морський бій', callback_data: 'new:battle' }],
     [{ text: '🎭 Мафія', callback_data: 'new:mafia' }, { text: '🂡 Тисяча', callback_data: 'new:thousand' }],
     [{ text: '🕵️ Шпигун', callback_data: 'new:spy' }, { text: '🐐 Козел', callback_data: 'new:goat' }],
-    [{ text: '🏆 Топ тижня', callback_data: 'top' }],
+    [{ text: '🎯 Розписний покер', callback_data: 'new:rpoker' }, { text: '🏆 Топ тижня', callback_data: 'top' }],
   ],
 });
 const MENU_TEXT = '🎲 <b>Ігри UA</b> — оберіть гру, і бот збере кімнату. Хто натисне «Приєднатися», зайде до вас.';

@@ -3,8 +3,8 @@
 import { tg, CHANNEL, topText } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
-const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w' };
-const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day'];
+const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w' };
+const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w'];
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
 
@@ -24,13 +24,14 @@ const ACHIEVEMENTS = [
   ['🃏', 'Шулер', '15 перемог у Дурні', p => p.durak_w, 15],
   ['🂡', 'Тисячник', '5 перемог у Тисячі', p => p.thousand_w, 5],
   ['🐐', 'Не козел', '5 перемог у Козлі', p => p.goat_w, 5],
+  ['🎯', 'Снайпер', '5 перемог у Розписному покері', p => p.rpoker_w, 5],
   ['⚓', 'Адмірал', '15 перемог у Морському бої', p => p.battle_w, 15],
   ['🎭', 'Дон мафії', '5 перемог за мафію', p => p.don_w, 5],
   ['🏙', 'Захисник міста', '15 перемог за місто в Мафії', p => p.mafia_w - p.don_w, 15],
   ['🕵️', 'Розвідник', '3 перемоги шпигуном', p => p.spyrole_w, 3],
   ['🔍', 'Ловець шпигунів', '5 перемог агентом у Шпигуні', p => p.spy_w - p.spyrole_w, 5],
   ['🌈', 'Майстер на всі руки', 'Виграйте в кожну гру хоча б раз',
-    p => ['durak_w', 'thousand_w', 'goat_w', 'battle_w', 'mafia_w', 'spy_w'].filter(c => p[c] > 0).length, 6],
+    p => ['durak_w', 'thousand_w', 'goat_w', 'battle_w', 'mafia_w', 'spy_w', 'rpoker_w'].filter(c => p[c] > 0).length, 7],
 ];
 export function achievements(p) {
   return ACHIEVEMENTS.map(([icon, name, how, f, goal]) => {

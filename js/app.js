@@ -12,6 +12,8 @@ import * as spyE from './spy-engine.js';
 import * as spyUI from './spy-ui.js';
 import * as goatE from './goat-engine.js';
 import * as goatUI from './goat-ui.js';
+import * as rpokerE from './rpoker-engine.js';
+import * as rpokerUI from './rpoker-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -29,6 +31,7 @@ const GAMES = {
 GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3, noRandom: true };
 GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, defP: 5, noRandom: true };
 GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2', E: goatE, UI: goatUI, minP: 4, maxP: 4, noRandom: true };
+GAMES.rpoker = { title: 'Розписний покер', icon: '🎯', sub: '2–8 гравців', E: rpokerE, UI: rpokerUI, minP: 2, maxP: 8, defP: 4, noRandom: true };
 const SOON = [['🎴', 'Свара'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
@@ -118,7 +121,7 @@ function stat(game) {
   return s && typeof s.win === 'number' ? s : { win: 0, lose: 0, draw: 0 };
 }
 function addStat(game, res) { const s = stat(game); s[res] = (s[res] || 0) + 1; setPref('stats.' + game, s); }
-const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍', goat: '🐐' };
+const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍', goat: '🐐', rpoker: '💸' };
 function updStats(game) { const s = stat(game); $('stats').textContent = `🏆 ${s.win} · ${LOSE_ICON[game] || '✖'} ${s.lose}`; }
 
 // ---------- session ----------
@@ -254,7 +257,7 @@ function showRules(game, back) {
 function showSetup(game) {
   const g = GAMES[game];
   const cfg = Object.assign({ variant: 'podkidnoy', deck: 36, n: g.defP || 2 }, pref('cfg.' + game, {}));
-  const maxP = g.variants ? durakE.DECKS[durakE.deckOf(cfg)].max : g.maxP;
+  const maxP = g.variants ? durakE.DECKS[durakE.deckOf(cfg)].max : game === 'rpoker' ? rpokerE.DECKS[rpokerE.deckOf(cfg)].max : g.maxP;
   cfg.n = Math.min(Math.max(cfg.n, g.minP), maxP);
   const body = document.createElement('div');
   const chips = (label, opts, cur, pick) => {
@@ -275,12 +278,18 @@ function showSetup(game) {
     // the player count depends on the deck, so redraw the panel
     chips('Колода', decks, durakE.deckOf(cfg), v => { cfg.deck = v; setPref('cfg.' + game, cfg); showSetup(game); });
   }
+  if (game === 'rpoker') {
+    const decks = Object.entries(rpokerE.DECKS).map(([size, d]) => [Number(size), `${d.label} · до ${d.max}`]);
+    chips('Колода', decks, rpokerE.deckOf(cfg), v => { cfg.deck = v; setPref('cfg.' + game, cfg); showSetup(game); });
+    chips('Тривалість', [['full', 'Повна (з особливими раундами)'], ['short', 'Коротка']], cfg.length === 'short' ? 'short' : 'full', v => { cfg.length = v; });
+  }
   const ns = [];
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
   if (ns.length > 1 && !g.noBots) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   if (g.noBots) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Гра для живих людей: ${g.minP}–${g.maxP} гравців. Створіть кімнату й запросіть друзів.`; body.appendChild(l); }
   const s = stat(game);
-  const c = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) } : {});
+  const c = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) }
+    : game === 'rpoker' ? { deck: rpokerE.deckOf(cfg), length: cfg.length === 'short' ? 'short' : 'full' } : {});
   showPanel({
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
@@ -506,6 +515,7 @@ function showLobby(m) {
   const g = GAMES[m.game], me = m.you, isHost = m.host === me;
   const body = document.createElement('div');
   if (m.cfg.variant) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `${durakE.VARIANTS[durakE.variantOf(m.cfg)].label} · ${durakE.DECKS[durakE.deckOf(m.cfg)].label}`; body.appendChild(l); }
+  if (m.game === 'rpoker') { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `${rpokerE.DECKS[rpokerE.deckOf(m.cfg)].label} · ${m.cfg.length === 'short' ? 'коротка' : 'повна'} гра`; body.appendChild(l); }
   if (m.game === 'mafia') { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Від ${m.cfg.min} до ${m.cfg.max} гравців. Вільні місця можна заповнити ботами.`; body.appendChild(l); }
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {

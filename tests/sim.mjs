@@ -5,6 +5,7 @@ import * as mafia from '../js/mafia-engine.js';
 import * as thousand from '../js/thousand-engine.js';
 import * as spy from '../js/spy-engine.js';
 import * as goat from '../js/goat-engine.js';
+import * as rpoker from '../js/rpoker-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -113,5 +114,23 @@ for (let n = 5; n <= 12; n++) {
   };
   const r = run(goat, {}, 4, 300, goatCheck);
   console.log(`goat: ${r.games} games, avg ${Math.round(deals / r.games)} deals, eggs ${eggs}, gains`, gains, 'winners (team)', r.outcomes);
+}
+{
+  for (const deck of [36, 54]) for (const length of ['full', 'short']) for (const n of [2, 3, 4, 6, 8].filter(k => k <= rpoker.DECKS[deck].max)) {
+    let deals = 0, exact = 0, bids = 0;
+    const check = G => {
+      const ids = new Set(G.hands.flat().map(c => c.id));
+      if (ids.size !== G.hands.flat().length) throw new Error('rpoker duplicate card');
+      if (G.phase === 'bid' && G.bids.every(b => b != null) ) throw new Error('bidding not closed');
+      if (G.phase === 'play' && G.type !== 'mizer' && G.bids.reduce((a, b) => a + b, 0) === G.k) throw new Error('bids sum equals cards');
+      if (G.phase === 'score' && G.result && !G.result.__seen) {
+        G.result.__seen = true; deals++;
+        if (G.taken.reduce((a, b) => a + b, 0) !== G.k) throw new Error('tricks != cards');
+        if (G.type !== 'mizer') G.result.forEach(r => { bids++; if (r.bid === r.took) exact++; });
+      }
+    };
+    const r = run(rpoker, { deck, length }, n, 30, check);
+    console.log(`rpoker ${deck} ${length} n=${n}: ${deals / r.games} deals/game, exact bids ${Math.round(100 * exact / bids)}%`);
+  }
 }
 console.log('OK');

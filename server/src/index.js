@@ -54,6 +54,20 @@ export default {
       if (!user) return json({ error: 'not telegram' }, 401);
       return json(await statsCall(env, '/profile', { id: user.id }));
     }
+    if (url.pathname === '/api/hello' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
+      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref });
+      if (r.inviter) {
+        // tell the friend who invited (works if they have ever opened a chat with the bot)
+        ctx.waitUntil(tg(env, 'sendMessage', {
+          chat_id: r.inviter.slice(3), parse_mode: 'HTML',
+          text: `🎉 Ваш друг <b>${esc(user.name)}</b> прийшов за вашим запрошенням — вам <b>+${r.inviterBonus}</b> очок!`,
+        }).catch(() => {}));
+      }
+      return json({ ok: r.ok, welcome: r.welcome, bonus: r.bonus, invitedBy: r.invitedBy });
+    }
     if (url.pathname === '/api/daily' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);

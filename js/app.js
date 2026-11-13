@@ -184,6 +184,11 @@ function showHub() {
   lookBtn.onclick = showLooks;
   row0.append(codeBtn, lookBtn);
   top.appendChild(row0);
+  const inviteBtn = document.createElement('button');
+  inviteBtn.className = 'hubact';
+  inviteBtn.textContent = '👥 Запросити друзів · +15 за кожного';
+  inviteBtn.onclick = showInviteFriends;
+  top.appendChild(inviteBtn);
   const open = url => { if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); };
   const row = document.createElement('div');
   row.className = 'hubrow';
@@ -623,7 +628,46 @@ function showLobby(m) {
   });
 }
 
-function inviteLink() { return inTelegram || !location.search.includes('server=') ? `${APP_LINK}?startapp=${S.code}` : `${location.origin}${location.pathname}?room=${S.code}&server=${encodeURIComponent(serverBase())}`; }
+// my Telegram id: room links and the personal link carry it, so a new friend counts as my invite
+const myTgId = () => { const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user; return u && u.id ? String(u.id) : ''; };
+function inviteLink() {
+  if (inTelegram || !location.search.includes('server=')) return `${APP_LINK}?startapp=${S.code}${myTgId() ? '_r' + myTgId() : ''}`;
+  return `${location.origin}${location.pathname}?room=${S.code}&server=${encodeURIComponent(serverBase())}`;
+}
+const personalLink = () => `${APP_LINK}?startapp=r${myTgId()}`;
+
+function showInviteFriends() {
+  if (!inTelegram || !myTgId()) {
+    return showPanel({ kind: 'invite', icon: '👥', title: 'Запросити друзів', text: 'Особисте посилання є в грі в Telegram (@IgryUA_bot).', buttons: [{ text: 'Зрозуміло', sec: true, fn: hidePanel }] });
+  }
+  const link = personalLink();
+  const share = () => {
+    const url = 'https://t.me/share/url?url=' + encodeURIComponent(link) + '&text=' + encodeURIComponent('Грай зі мною в «Ігри UA» 🎲 — Дурень, Покер, Мафія, Тисяча й інші. За цим посиланням отримаєш бонус!');
+    if (tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
+  };
+  const copy = () => { if (navigator.clipboard) navigator.clipboard.writeText(link).then(() => toast('Посилання скопійовано'), () => prompt('Посилання:', link)); else prompt('Посилання:', link); };
+  showPanel({
+    kind: 'invite', icon: '👥', title: 'Запросити друзів',
+    text: `За кожного нового друга, який прийде за вашим посиланням, — +15 очок вам і +5 йому до вітального бонусу.\nПосилання на кімнату теж рахується.\n\n${link}`,
+    buttons: [{ text: '📨 Надіслати в Telegram', fn: share }, { text: '📋 Скопіювати', sec: true, fn: copy }, { text: 'Закрити', sec: true, fn: hidePanel }],
+  });
+}
+
+// First visit in Telegram: welcome bonus (and the friend's invite, if the app was opened by his link)
+async function sayHello(ref) {
+  if (!inTelegram) return;
+  try {
+    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData, ref }) })).json();
+    if (!r.welcome) return;
+    sfx('win'); haptic('success');
+    const show = () => showPanel({
+      kind: 'welcome', icon: '🎉', title: `Вітаємо! +${r.bonus} очок`,
+      text: (r.invitedBy ? `Вас запросив ${r.invitedBy} — за це ще +5.\n` : '') + 'Грайте з ботами чи друзями, забирайте 🎁 бонус дня й відкривайте 🎨 нове оформлення.',
+      buttons: [{ text: 'Грати!', fn: hidePanel }],
+    });
+    if (panelKind()) setTimeout(show, 4000); else show();   // do not cover a room that is opening
+  } catch (e) {}
+}
 function shareInvite() {
   if (!S || !S.code) return;
   const g = GAMES[S.game] || GAMES.durak;
@@ -692,9 +736,15 @@ function showReact(m) {
   sfx('pop');
 }
 
-const startCode = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || new URLSearchParams(location.search).get('room') || '').toUpperCase();
+// start parameter: "CODE" (room), "r123" (friend's invite) or "CODE_r123" (room link from a friend)
+let startCode = '', startRef = null;
+for (const part of String((tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || new URLSearchParams(location.search).get('room') || '').split('_')) {
+  if (/^r\d{3,15}$/.test(part)) startRef = part.slice(1);
+  else if (/^[A-Za-z0-9]{4,8}$/.test(part)) startCode = part.toUpperCase();
+}
 showHub();
-if (/^[A-Z0-9]{4,8}$/.test(startCode)) joinRoom(startCode, null);
+if (startCode) joinRoom(startCode, null);
+sayHello(startRef);
 
 // test hook: window.games.start('durak', {variant:'perevod'}, 4)
 window.games = { start: startLocal, showHub, act: m => api.act(m), get session() { return S; }, get view() { return lastView; } };

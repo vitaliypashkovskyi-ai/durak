@@ -4,7 +4,9 @@ import { tg, CHANNEL, topText } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w' };
-const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w'];
+const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
+  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today'];
+const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = 10;
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
 
@@ -30,6 +32,7 @@ const ACHIEVEMENTS = [
   ['🏙', 'Захисник міста', '15 перемог за місто в Мафії', p => p.mafia_w - p.don_w, 15],
   ['🕵️', 'Розвідник', '3 перемоги шпигуном', p => p.spyrole_w, 3],
   ['🔍', 'Ловець шпигунів', '5 перемог агентом у Шпигуні', p => p.spy_w - p.spyrole_w, 5],
+  ['🤝', 'Душа компанії', 'Запросіть 5 друзів', p => p.refs, 5],
   ['🌈', 'Майстер на всі руки', 'Виграйте в кожну гру хоча б раз',
     p => ['durak_w', 'thousand_w', 'goat_w', 'battle_w', 'mafia_w', 'spy_w', 'rpoker_w'].filter(c => p[c] > 0).length, 7],
 ];
@@ -70,6 +73,7 @@ export class Stats {
     if (url.pathname === '/report') { this.report(body); return json({ ok: true }); }
     if (url.pathname === '/profile') return json(this.profile(body.id));
     if (url.pathname === '/daily') return json(this.daily(body.id, body.name));
+    if (url.pathname === '/hello') return json(this.hello(body.id, body.name, body.ref));
     if (url.pathname === '/top') return json(this.top(url.searchParams.get('period')));
     if (url.pathname === '/community') return json(await this.community());
     if (url.pathname === '/weekly') return json(await this.weekly());
@@ -106,6 +110,31 @@ export class Stats {
     // next = what the next claim gives (today if not claimed yet, otherwise tomorrow)
     const daily = { available: p.last_day !== today, streak, next: dailyBonus(p.last_day === today || p.last_day === today - 1 ? p.streak + 1 : 1) };
     return { ...p, rank, week, level: level(p.points), badges: badges(p), achievements: achievements(p), daily };
+  }
+
+  // First visit: +10 once. A brand-new player who came by a friend's link gets +5 more and the
+  // friend +15 (at most 10 friends a day per inviter).
+  hello(id, name, ref) {
+    if (!/^tg:\d+$/.test(String(id))) return { ok: false };
+    const existed = this.sql.exec('SELECT welcome_done FROM players WHERE id = ?', id).toArray()[0];
+    if (existed && existed.welcome_done) return { ok: true, welcome: false };
+    this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
+    let bonus = WELCOME, inviter = null;
+    const refId = /^\d{3,15}$/.test(String(ref || '')) ? 'tg:' + ref : null;
+    if (!existed && refId && refId !== id) {
+      const inv = this.sql.exec('SELECT name, ref_day, ref_today FROM players WHERE id = ?', refId).toArray()[0];
+      const today = kyivDay();
+      const used = inv && inv.ref_day === today ? inv.ref_today : 0;
+      if (inv && used < REF_PER_DAY) {
+        this.sql.exec('UPDATE players SET points = points + ?, refs = refs + 1, ref_day = ?, ref_today = ? WHERE id = ?',
+          REF_INVITER, today, used + 1, refId);
+        this.sql.exec('UPDATE players SET ref_by = ? WHERE id = ?', refId, id);
+        bonus += REF_FRIEND;
+        inviter = { id: refId, name: inv.name };
+      }
+    }
+    this.sql.exec('UPDATE players SET points = points + ?, welcome_done = 1 WHERE id = ?', bonus, id);
+    return { ok: true, welcome: true, bonus, invitedBy: inviter ? inviter.name : null, inviter: inviter ? inviter.id : null, inviterBonus: REF_INVITER };
   }
 
   // Daily bonus: +1 on the first day of a streak, +2 on the second… up to +7 a day.

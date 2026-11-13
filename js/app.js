@@ -1,5 +1,5 @@
 // Games hub: menu, games with bots (in the page) and online rooms (Cloudflare server).
-import { $, tg, inTelegram, haptic, toast, showPanel, hidePanel, panelKind } from './common.js';
+import { $, tg, inTelegram, haptic, toast, showPanel, hidePanel, panelKind, sfx, sound, setSound } from './common.js';
 import * as durakE from './durak-engine.js';
 import * as battleE from './battle-engine.js';
 import * as durakUI from './durak-ui.js';
@@ -8,6 +8,8 @@ import * as mafiaE from './mafia-engine.js';
 import * as mafiaUI from './mafia-ui.js';
 import * as thousandE from './thousand-engine.js';
 import * as thousandUI from './thousand-ui.js';
+import * as spyE from './spy-engine.js';
+import * as spyUI from './spy-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -23,7 +25,8 @@ const GAMES = {
   mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7, noRandom: true },
 };
 GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3, noRandom: true };
-const SOON = [['🐐', 'Козел'], ['🎴', 'Свара'], ['🕵️', 'Шпигун'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
+GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, noRandom: true, noBots: true };
+const SOON = [['🐐', 'Козел'], ['🎴', 'Свара'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
 
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }
 
@@ -36,7 +39,7 @@ function stat(game) {
   return s && typeof s.win === 'number' ? s : { win: 0, lose: 0, draw: 0 };
 }
 function addStat(game, res) { const s = stat(game); s[res] = (s[res] || 0) + 1; setPref('stats.' + game, s); }
-const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉' };
+const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍' };
 function updStats(game) { const s = stat(game); $('stats').textContent = `🏆 ${s.win} · ${LOSE_ICON[game] || '✖'} ${s.lose}`; }
 
 // ---------- session ----------
@@ -61,6 +64,7 @@ function showHub() {
   $('game').hidden = true; $('game').innerHTML = '';
   $('hub').hidden = false;
   $('backBtn').hidden = true; $('rulesBtn').hidden = true;
+  $('soundBtn').hidden = true; $('reactBtn').hidden = true; $('reactBar').hidden = true;
   $('title').innerHTML = 'Ігри <span>♦</span>';
   $('stats').textContent = '';
   if (tg && tg.BackButton) tg.BackButton.hide();
@@ -136,6 +140,8 @@ function openGame(game) {
   const g = GAMES[game];
   $('hub').hidden = true; $('game').hidden = false;
   $('backBtn').hidden = false; $('rulesBtn').hidden = false;
+  $('soundBtn').hidden = false; $('soundBtn').textContent = sound.on ? '🔊' : '🔇';
+  $('reactBtn').hidden = !(S && S.kind === 'online'); $('reactBar').hidden = true;
   $('title').textContent = `${g.icon} ${g.title}`;
   $('game').className = 'g-' + game;
   updStats(game);
@@ -177,13 +183,14 @@ function showSetup(game) {
   }
   const ns = [];
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
-  if (ns.length > 1) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
+  if (ns.length > 1 && !g.noBots) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
+  if (g.noBots) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Гра для живих людей: ${g.minP}–${g.maxP} гравців. Створіть кімнату й запросіть друзів.`; body.appendChild(l); }
   const s = stat(game);
   const c = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) } : {});
   showPanel({
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
-      { text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) },
+      ...(g.noBots ? [] : [{ text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) }]),
       { text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) },
       ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c()) }]),
       { text: '📖 Правила', sec: true, fn: () => showRules(game, () => showSetup(game)) },
@@ -222,6 +229,7 @@ function onView(v) {
     const r = g.UI.result(v);
     addStat(v.game, r.res); updStats(v.game);
     haptic(r.res === 'lose' ? 'error' : 'success');
+    sfx(r.res === 'lose' ? 'lose' : 'win');
     setTimeout(() => { if (S && overShown === key) showResult(v); }, 700);
   } else if (panelKind() === 'result') showResult(v);
 }
@@ -346,12 +354,13 @@ function joinRoom(code, create) {
 function onRoomMsg(m) {
   if (!S || S.kind !== 'online') return;
   if (m.type === 'toast') return toast(m.text);
+  if (m.type === 'react') return showReact(m);
   if (m.type === 'error') {
     setPref('lastRoom', null);
     return showPanel({ kind: 'error', icon: '😕', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] });
   }
   if (m.type === 'lobby' || m.type === 'state') setPref('lastRoom', { code: S.code, game: m.game, t: Date.now() });
-  if (m.type === 'lobby') { S.game = m.game; return showLobby(m); }
+  if (m.type === 'lobby') { S.game = m.game; S.lobby = m; return showLobby(m); }
   if (m.type !== 'state') return;
   if (!S.mounted || S.game !== m.game) { S.game = m.game; S.mounted = true; openGame(m.game); }
   if (['lobby', 'connect'].includes(panelKind())) hidePanel();
@@ -379,11 +388,11 @@ function showLobby(m) {
     { text: '📋 Скопіювати посилання', sec: true, fn: copyInvite },
   ];
   if (isHost) {
-    const bots = m.seats.filter(s => s.bot).length;
-    buttons.push({ text: '➕ Додати бота', sec: true, disabled: m.seats.length >= m.cfg.max, fn: () => netSend({ t: 'addBot' }) });
+    const bots = m.seats.filter(s => s.bot).length, noBots = GAMES[m.game].noBots;
+    if (!noBots) buttons.push({ text: '➕ Додати бота', sec: true, disabled: m.seats.length >= m.cfg.max, fn: () => netSend({ t: 'addBot' }) });
     if (bots) buttons.push({ text: '➖ Прибрати бота', sec: true, fn: () => netSend({ t: 'removeBot' }) });
     const min = m.cfg.min || 2;
-    if (m.seats.length < min && m.seats.length < m.cfg.max) {
+    if (!noBots && m.seats.length < min && m.seats.length < m.cfg.max) {
       buttons.push({ text: `🤖 Доповнити ботами до ${min}`, sec: true, fn: () => { for (let k = m.seats.length; k < min; k++) netSend({ t: 'addBot' }); } });
     }
     buttons.push({ text: m.seats.length < min ? `▶ Почати (потрібно ${min}+)` : `▶ Почати гру (${m.seats.length})`, disabled: m.seats.length < min, fn: () => netSend({ t: 'start' }) });
@@ -442,6 +451,30 @@ function findMatch(game, cfg) {
 $('backBtn').onclick = showHub;
 if (tg && tg.BackButton) tg.BackButton.onClick(showHub);
 $('rulesBtn').onclick = () => { if (S && S.game) showRules(S.game); };
+
+// ---------- sound switch and quick reactions ----------
+$('soundBtn').onclick = () => { setSound(!sound.on); $('soundBtn').textContent = sound.on ? '🔊' : '🔇'; if (sound.on) sfx('pop'); };
+const REACTIONS = ['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔'];
+REACTIONS.forEach(e => {
+  const b = document.createElement('button');
+  b.textContent = e;
+  b.onclick = () => { netSend({ t: 'react', e }); $('reactBar').hidden = true; };
+  $('reactBar').appendChild(b);
+});
+$('reactBtn').onclick = () => { $('reactBar').hidden = !$('reactBar').hidden; };
+function showReact(m) {
+  const v = lastView;
+  let name = 'Гравець';
+  if (v && v.players && v.players[m.from]) name = m.from === v.seat ? 'Ви' : v.players[m.from].name;
+  else if (S && S.lobby && S.lobby.seats[m.from]) name = S.lobby.seats[m.from].name;
+  const d = document.createElement('div');
+  d.className = 'rx';
+  d.textContent = name;
+  const b = document.createElement('b'); b.textContent = m.e; d.appendChild(b);
+  $('reacts').appendChild(d);
+  setTimeout(() => d.remove(), 2700);
+  sfx('pop');
+}
 
 const startCode = ((tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || new URLSearchParams(location.search).get('room') || '').toUpperCase();
 showHub();

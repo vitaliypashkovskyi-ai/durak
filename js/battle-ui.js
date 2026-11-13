@@ -1,5 +1,5 @@
 // Морський бій: screen.
-import { $, haptic, toast } from './common.js';
+import { $, haptic, toast, sfx } from './common.js';
 
 export const rules = `
 <p>Поле 10×10. Флот: один корабель на 4 клітинки, два на 3, три на 2 і чотири на 1. Кораблі не торкаються навіть кутами.</p>
@@ -42,6 +42,7 @@ function evToast(e) {
   if (e.kind === 'start') toast(V.turn === me ? 'До бою! Ви стріляєте першим' : `До бою! Першим стріляє ${nm(V.turn)}`);
   if (e.kind === 'left') toast(`${V.players[e.who].name} вийшов — замість нього бот`);
   if (e.kind !== 'shot') return;
+  sfx(e.res === 'miss' ? 'splash' : 'boom');
   if (e.dead != null) toast(e.dead === me ? 'Ваш флот потоплено 💀' : `${nm(e.dead)} без флоту 💀`);
   else if (e.by === me) toast(e.res === 'miss' ? 'Мимо' : e.res === 'hit' ? 'Влучили! Стріляйте ще' : 'Потопили! Стріляйте ще');
   else if (e.target === me && e.res !== 'miss') { toast(`${nm(e.by)} ${e.res === 'sunk' ? 'потопив ваш корабель' : 'влучив у вас'}`); haptic('medium'); }

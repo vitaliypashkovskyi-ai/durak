@@ -19,7 +19,9 @@ header{display:flex;align-items:center;gap:8px;padding:10px 14px 4px}
 header h1{font-size:18px;margin:0;flex:1;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header h1 span{color:var(--gold)}
 .stat{font-size:13px;color:var(--muted);white-space:nowrap}
-.hbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:7px 11px;font-size:15px;cursor:pointer}
+.hbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:7px 9px;font-size:15px;cursor:pointer;flex:none}
+header{gap:6px}
+@media (max-width:400px){ header h1{font-size:16px} .stat{font-size:11px} }
 
 /* hub */
 #hub{flex:1;overflow:auto;padding:8px 14px 20px}
@@ -148,6 +150,12 @@ header h1 span{color:var(--gold)}
 .msay input:disabled{opacity:.5}
 .msay button{border:0;border-radius:12px;padding:0 16px;font-size:18px;background:var(--blue);color:#fff;cursor:pointer}
 
+/* spy */
+.locs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-height:50vh;overflow:auto;margin-top:6px}
+.locs .loc{background:#eee8da;border-radius:8px;padding:4px 8px;font-size:13px}
+.locs .loc.cur{background:var(--gold);font-weight:700}
+.locs.pick .chip{font-size:13px;padding:6px 9px}
+
 /* thousand */
 .tscore{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:4px 10px 0}
 .tsc.me{color:#fff;font-weight:600}
@@ -166,6 +174,14 @@ header h1 span{color:var(--gold)}
 #tBtns button{padding:9px 14px;font-size:15px}
 #hand .card.picked{transform:translateY(-18px);box-shadow:0 0 0 3px var(--gold),0 2px 6px rgba(0,0,0,.35)}
 #hand .card.marry::before{content:"💍";position:absolute;right:-4px;top:-10px;font-size:14px}
+
+/* reactions */
+#reactBar{display:flex;justify-content:center;gap:6px;padding:4px 10px 6px;flex-wrap:wrap}
+#reactBar button{border:0;background:rgba(255,255,255,.14);border-radius:12px;font-size:22px;padding:4px 9px;cursor:pointer}
+#reacts{position:fixed;left:0;right:0;top:70px;display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;z-index:15}
+.rx{background:rgba(0,0,0,.7);border-radius:16px;padding:5px 12px;font-size:15px;animation:rx 2.6s ease-out forwards}
+.rx b{font-size:22px;vertical-align:middle;margin-left:4px}
+@keyframes rx{0%{opacity:0;transform:translateY(10px) scale(.8)}12%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(-24px)}}
 
 /* toast + panel */
 #toast{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%) scale(.9);background:rgba(0,0,0,.75);padding:10px 18px;border-radius:12px;font-size:17px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center;z-index:20}
@@ -202,13 +218,35 @@ header h1 span{color:var(--gold)}
     <button class="hbtn" id="backBtn" hidden aria-label="Назад">←</button>
     <h1 id="title">Ігри <span>♦</span></h1>
     <span class="stat" id="stats"></span>
+    <button class="hbtn" id="reactBtn" hidden aria-label="Реакції">😊</button>
+    <button class="hbtn" id="soundBtn" hidden aria-label="Звук">🔊</button>
     <button class="hbtn" id="rulesBtn" hidden aria-label="Правила">?</button>
   </header>
+  <div id="reactBar" hidden></div>
   <section id="hub"></section>
   <section id="game" hidden></section>
 </div>
 <div id="toast"></div>
+<div id="reacts"></div>
 <div class="overlay" id="ov" hidden><div class="panel" id="ovPanel"></div></div>
-<script type="module" src="js/app.js?v=16"></script>
+<!-- One version for every module, so a browser never mixes a fresh file with a cached old one.
+     Bump V everywhere on this line block at each release. -->
+<script type="importmap">
+{ "imports": {
+  "./js/common.js": "./js/common.js?v=17",
+  "./js/host.js": "./js/host.js?v=17",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=17",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=17",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=17",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=17",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=17",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=17",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=17",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=17",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=17",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=17"
+} }
+</script>
+<script type="module" src="js/app.js?v=17"></script>
 </body>
 </html>

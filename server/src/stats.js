@@ -3,7 +3,8 @@
 import { tg, CHANNEL, topText } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
-const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w' };
+const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w' };
+const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w'];
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
 
@@ -18,6 +19,7 @@ export function badges(p) {
   if (p.durak_w >= 15) b.push('🃏 Шулер');
   if (p.battle_w >= 15) b.push('⚓ Адмірал');
   if (p.thousand_w >= 5) b.push('🂡 Тисячник');
+  if (p.spyrole_w >= 3) b.push('🕵️ Розвідник');
   if (p.don_w >= 5) b.push('🎭 Дон мафії');
   if (p.mafia_w - p.don_w >= 15) b.push('🏙 Захисник міста');
   return b;
@@ -33,7 +35,7 @@ export class Stats {
       games INTEGER DEFAULT 0, wins INTEGER DEFAULT 0, durak_w INTEGER DEFAULT 0, battle_w INTEGER DEFAULT 0,
       mafia_w INTEGER DEFAULT 0, don_w INTEGER DEFAULT 0)`);
     const cols = this.sql.exec('PRAGMA table_info(players)').toArray().map(c => c.name);
-    if (!cols.includes('thousand_w')) this.sql.exec('ALTER TABLE players ADD COLUMN thousand_w INTEGER DEFAULT 0');
+    for (const c of EXTRA_COLS) if (!cols.includes(c)) this.sql.exec(`ALTER TABLE players ADD COLUMN ${c} INTEGER DEFAULT 0`);
     this.sql.exec('CREATE TABLE IF NOT EXISTS results(id TEXT, game TEXT, res TEXT, pts INTEGER, ts INTEGER)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS results_ts ON results(ts)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)');
@@ -59,8 +61,11 @@ export class Stats {
       if (!/^tg:\d+$/.test(p.id) || !PTS.hasOwnProperty(p.res)) continue;
       const pts = PTS[p.res], win = p.res === 'win' ? 1 : 0;
       this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', p.id, String(p.name).slice(0, 24));
-      this.sql.exec(`UPDATE players SET points = points + ?, games = games + 1, wins = wins + ?, ${col} = ${col} + ?, don_w = don_w + ? WHERE id = ?`,
-        pts, win, win, p.don && win ? 1 : 0, p.id);
+      // p.don = special role won: the mafia (mafia) or the spy (spy)
+      const special = p.don && win ? 1 : 0;
+      this.sql.exec(`UPDATE players SET points = points + ?, games = games + 1, wins = wins + ?, ${col} = ${col} + ?,
+        don_w = don_w + ?, spyrole_w = spyrole_w + ? WHERE id = ?`,
+      pts, win, win, game === 'mafia' ? special : 0, game === 'spy' ? special : 0, p.id);
       this.sql.exec('INSERT INTO results(id, game, res, pts, ts) VALUES(?, ?, ?, ?, ?)', p.id, game, p.res, pts, now);
     }
     this.sql.exec('DELETE FROM results WHERE ts < ?', now - 5 * WEEK);

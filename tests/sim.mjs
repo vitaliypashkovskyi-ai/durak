@@ -3,6 +3,7 @@ import * as durak from '../js/durak-engine.js';
 import * as battle from '../js/battle-engine.js';
 import * as mafia from '../js/mafia-engine.js';
 import * as thousand from '../js/thousand-engine.js';
+import * as spy from '../js/spy-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -86,5 +87,15 @@ for (let n = 5; n <= 12; n++) {
   };
   const r = run(thousand, {}, 3, 100, thCheck);
   console.log(`thousand: ${r.games} games, avg ${Math.round(deals / r.games)} deals, contracts made ${Math.round(100 * made / deals)}%, avg contract ${Math.round(contracts / deals)}, marriages ${marriagesSeen}, winners`, r.outcomes, 'made by contract [deals, made]:', JSON.stringify(thStats));
+}
+{
+  const spyCheck = G => {
+    const v = spy.view(G, G.spy);
+    if (!G.over && v.loc !== null) throw new Error('location leaked to the spy');
+  };
+  for (const n of [3, 6, 10]) {
+    const r = run(spy, {}, n, 200, spyCheck);
+    console.log(`spy n=${n}: ${r.games} games, winners`, r.outcomes);
+  }
 }
 console.log('OK');

@@ -8,14 +8,17 @@ import * as durak from '../../js/durak-engine.js';
 import * as battle from '../../js/battle-engine.js';
 import * as mafia from '../../js/mafia-engine.js';
 import * as thousand from '../../js/thousand-engine.js';
+import * as spy from '../../js/spy-engine.js';
 import { Host } from '../../js/host.js';
 import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia, thousand };
-const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3 };
-const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3 };   // durak: depends on the deck, see roomConfig
-const NO_RANDOM = new Set(['mafia', 'thousand']);
+const ENGINES = { durak, battle, mafia, thousand, spy };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10 };   // durak: depends on the deck, see roomConfig
+const NO_RANDOM = new Set(['mafia', 'thousand', 'spy']);
+const NO_BOTS = new Set(['spy']);   // a conversation game: humans only
+const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
 const LEFT_MS = 60000;       // a human offline for this long is replaced by a bot
@@ -303,9 +306,15 @@ export class Room {
       return;
     }
     if (m.t === 'advertise') return this.advertise(s);
+    if (m.t === 'react') {
+      // quick emoji reactions: shown to everyone at the table, at most one per second per player
+      if (!REACTIONS.has(m.e) || Date.now() - (s.lastReact || 0) < 1000) return;
+      s.lastReact = Date.now();
+      return this.seats.forEach(x => { if (x.ws) send(x.ws, { type: 'react', from: i, e: m.e }); });
+    }
     if (!this.G) {                   // lobby commands (host only)
       if (s.id !== this.hostId) return;
-      if (m.t === 'addBot' && this.seats.length < this.cfg.max) {
+      if (m.t === 'addBot' && this.seats.length < this.cfg.max && !NO_BOTS.has(this.cfg.game)) {
         const used = new Set(this.seats.map(x => x.name));
         const name = BOT_NAMES.find(n => !used.has(n)) || 'Бот';
         this.seats.push({ id: 'bot:' + genCode(), name, ws: null, bot: true, botOnly: true });
@@ -360,6 +369,9 @@ export class Room {
         const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
         res = G.winner === team ? 'win' : 'lose';
         don = team === 'mafia';
+      } else if (G.game === 'spy') {
+        res = G.winner === (i === G.spy ? 'spy' : 'town') ? 'win' : 'lose';
+        don = i === G.spy;   // counted as «won as the spy» for the badge
       } else return;
       players.push({ id: s.id, name: s.name, res, don });
     });

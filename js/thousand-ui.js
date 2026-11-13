@@ -1,6 +1,6 @@
 // Тисяча: screen — torg, prykup, contract, tricks, deal results.
 import * as E from './thousand-engine.js';
-import { $, haptic, toast } from './common.js';
+import { $, haptic, toast, sfx } from './common.js';
 
 export const rules = `
 <p>3 гравці, 24 карти (9, валет, дама, король, 10, туз). Очки: туз 11, десятка 10, король 4, дама 3, валет 2, дев'ятка 0. У колоді 120 очок.</p>
@@ -34,6 +34,7 @@ const suitHtml = s => `<b class="${s >= 2 ? 'redsuit' : ''}">${E.SUITS[s]}</b>`;
 export function render(v) {
   const fresh = v.num !== lastNum;
   if (V && V.phase !== v.phase) sel = null;
+  if (V && !fresh && v.trick.length > V.trick.length) sfx('card');
   V = v; busy = false;
   if (fresh) { lastNum = v.num; sel = null; }
   if (v.ev) evToast(v.ev);
@@ -43,7 +44,8 @@ export function render(v) {
 function evToast(e) {
   if (e.kind === 'talon') toast(`${nm(e.who)} ${e.who === V.seat ? 'берете' : 'бере'} прикуп за ${e.bid}`);
   if (e.kind === 'contract') toast(`${nm(e.who)} ${e.who === V.seat ? 'граєте' : 'грає'} ${e.v}`);
-  if (e.kind === 'marriage') { toast(`${nm(e.who)}: марьяж ${E.SUITS[e.s]} +${e.v}! Козир ${E.SUITS[e.s]}`); haptic('medium'); }
+  if (e.kind === 'marriage') { toast(`${nm(e.who)}: марьяж ${E.SUITS[e.s]} +${e.v}! Козир ${E.SUITS[e.s]}`); haptic('medium'); sfx('chime'); }
+  if (e.kind === 'trick') sfx('swish');
   if (e.kind === 'deal') toast('Роздачу завершено');
   if (e.kind === 'left') toast(`${V.players[e.who].name} вийшов — замість нього бот`);
 }

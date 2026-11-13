@@ -198,7 +198,9 @@ function showHub() {
   row2.append(rateBtn, giftBtn);
   top.appendChild(row2);
   const grid = h.querySelector('.hubgrid');
-  for (const [id, g] of Object.entries(GAMES)) {
+  // menu order: Дурень, then Розписний покер, then the rest as they were added
+  const order = ['durak', 'rpoker', ...Object.keys(GAMES).filter(k => k !== 'durak' && k !== 'rpoker')];
+  for (const [id, g] of order.map(k => [k, GAMES[k]])) {
     const b = document.createElement('button');
     b.className = 'gcard';
     b.innerHTML = `<span class="ic">${g.icon}</span><b>${g.title}</b><small>${g.sub}</small>`;

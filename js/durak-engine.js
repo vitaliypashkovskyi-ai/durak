@@ -1,9 +1,17 @@
-// Дурень: підкидний / переводний, 2–6 гравців, + бот.
+// Дурень: підкидний / переводний; колода 36 (2–6 гравців), 52 (до 8) або дві по 36 (до 12); + бот.
 // Pure JS with no DOM: the page uses it for games with bots, the server for online games.
 // Rule helpers accept either the full state G or a player's view V (see cnt/isDone/hasPassed).
 
-export const RANKS = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
+export const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
 export const SUITS = ['♠', '♣', '♥', '♦'];
+const R = name => RANKS.indexOf(name);
+// from = lowest rank index, copies = how many identical decks are shuffled together
+export const DECKS = {
+  36: { from: R('6'), copies: 1, max: 6, label: '36 карт' },
+  52: { from: R('2'), copies: 1, max: 8, label: '52 карти' },
+  72: { from: R('6'), copies: 2, max: 12, label: '2 × 36' },
+};
+export const deckOf = cfg => (cfg && DECKS[cfg.deck] ? Number(cfg.deck) : 36);
 export const delay = { bot: 750, advance: 900 };
 
 function rnd(n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
@@ -47,12 +55,16 @@ export function canPass(S, seat) {
 }
 
 export function create(cfg, players) {
+  const size = deckOf(cfg), D = DECKS[size];
   const deck = [];
-  for (let s = 0; s < 4; s++) for (let r = 0; r < 9; r++) deck.push({ s, r, id: s * 9 + r });
+  for (let k = 0; k < D.copies; k++) {
+    for (let s = 0; s < 4; s++) for (let r = D.from; r < RANKS.length; r++) deck.push({ s, r, id: k * 52 + s * 13 + r });
+  }
   shuffle(deck);
   const n = players.length;
   const G = {
     game: 'durak', variant: cfg && cfg.variant === 'perevod' ? 'perevod' : 'podkidnoy',
+    deckSize: size, total: deck.length,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     deck, trump: deck[0].s, trumpCard: deck[0], hands: players.map(() => []), table: [],
     attacker: 0, defender: 1, taking: false,
@@ -140,7 +152,7 @@ export function view(G, seat) {
     game: 'durak', variant: G.variant, seat, num: G.num,
     players: G.players.map((p, i) => ({ name: p.name, bot: p.bot, count: G.hands[i].length, done: G.done[i], passed: G.passed[i] })),
     hand: G.hands[seat] ? G.hands[seat].slice() : [],
-    table: G.table, deck: G.deck.length, trump: G.trump, trumpCard: G.trumpCard,
+    table: G.table, deck: G.deck.length, deckSize: G.deckSize, trump: G.trump, trumpCard: G.trumpCard,
     attacker: G.attacker, defender: G.defender, taking: G.taking, out: G.out, firstBout: G.firstBout,
     over: G.over, loser: G.loser, ev: G.ev,
   };
@@ -157,7 +169,7 @@ export function waiting(G) {
 }
 
 // ---------- bot ----------
-const val = (G, c) => c.r + (c.s === G.trump ? 10 : 0);
+const val = (G, c) => c.r + (c.s === G.trump ? 20 : 0);
 function planDefense(G, seat) {
   const hand = [...G.hands[seat]], plan = [];
   const targets = G.table.map((p, i) => ({ p, i })).filter(t => !t.p.d).sort((u, v) => val(G, v.p.a) - val(G, u.p.a));
@@ -184,12 +196,12 @@ export function botAction(G, seat) {
     if (transfers.length && transfers[0].s !== G.trump) return { t: 'transfer', id: transfers[0].id };
     const plan = planDefense(G, seat);
     const costly = plan && G.deck.length > 8 &&
-      plan.some(m => m.c.s === G.trump && G.table[m.i].a.s !== G.trump && m.c.r >= 7);
+      plan.some(m => m.c.s === G.trump && G.table[m.i].a.s !== G.trump && m.c.r >= R('К'));
     if (!plan || costly) return transfers.length ? { t: 'transfer', id: transfers[0].id } : { t: 'take' };
     return { t: 'cover', i: plan[0].i, id: plan[0].c.id };
   }
   if (G.passed[seat] || (!G.taking && undefended(G))) return null;   // let the defender answer first
   const add = hand.filter(c => canAdd(G, seat, c))
-    .filter(c => !G.deck.length || (c.s !== G.trump && c.r <= 6)).sort(by)[0];
+    .filter(c => !G.deck.length || (c.s !== G.trump && c.r <= R('Д'))).sort(by)[0];
   return add ? { t: 'play', id: add.id } : { t: 'pass' };
 }

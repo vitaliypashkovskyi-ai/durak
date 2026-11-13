@@ -11,7 +11,7 @@ import { Host } from '../../js/host.js';
 
 const ENGINES = { durak, battle, mafia };
 const MIN = { durak: 2, battle: 2, mafia: 5 };
-const MAX = { durak: 6, battle: 4, mafia: 12 };
+const MAX = { durak: 6, battle: 4, mafia: 12 };   // durak: depends on the deck, see roomConfig
 const NO_RANDOM = new Set(['mafia']);
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
@@ -28,7 +28,8 @@ export default {
       const game = url.searchParams.get('game') || 'durak';
       const variant = url.searchParams.get('variant') === 'perevod' ? 'perevod' : '';
       if (!ENGINES[game] || NO_RANDOM.has(game)) return new Response('bad game', { status: 400 });
-      return env.LOBBY.get(env.LOBBY.idFromName(`${game}:${variant}`)).fetch(req);
+      const deck = game === 'durak' ? durak.deckOf({ deck: url.searchParams.get('deck') }) : '';
+      return env.LOBBY.get(env.LOBBY.idFromName(`${game}:${variant}:${deck}`)).fetch(req);
     }
     if (url.pathname === '/ws/room') {
       const code = (url.searchParams.get('room') || '').toUpperCase();
@@ -130,7 +131,11 @@ export class Lobby {
 function roomConfig(c) {
   if (!c || !ENGINES[c.game]) return null;
   const cfg = { game: c.game, min: MIN[c.game], max: MAX[c.game] };
-  if (c.game === 'durak') cfg.variant = c.variant === 'perevod' ? 'perevod' : 'podkidnoy';
+  if (c.game === 'durak') {
+    cfg.variant = c.variant === 'perevod' ? 'perevod' : 'podkidnoy';
+    cfg.deck = durak.deckOf(c);
+    cfg.max = durak.DECKS[cfg.deck].max;
+  }
   if (c.auto === 2) cfg.auto = 2;
   return cfg;
 }

@@ -14,7 +14,7 @@ const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 
 const GAMES = {
-  durak: { title: 'Дурень', icon: '🃏', sub: '2–6 гравців', E: durakE, UI: durakUI, minP: 2, maxP: 6, variants: true },
+  durak: { title: 'Дурень', icon: '🃏', sub: '2–12 гравців', E: durakE, UI: durakUI, minP: 2, maxP: 12, variants: true },
   battle: { title: 'Морський бій', icon: '🚢', sub: '2–4 гравці', E: battleE, UI: battleUI, minP: 2, maxP: 4 },
   mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7, noRandom: true },
 };
@@ -131,8 +131,9 @@ function showRules(game, back) {
 // ---------- setup ----------
 function showSetup(game) {
   const g = GAMES[game];
-  const cfg = Object.assign({ variant: 'podkidnoy', n: g.defP || 2 }, pref('cfg.' + game, {}));
-  cfg.n = Math.min(Math.max(cfg.n, g.minP), g.maxP);
+  const cfg = Object.assign({ variant: 'podkidnoy', deck: 36, n: g.defP || 2 }, pref('cfg.' + game, {}));
+  const maxP = g.variants ? durakE.DECKS[durakE.deckOf(cfg)].max : g.maxP;
+  cfg.n = Math.min(Math.max(cfg.n, g.minP), maxP);
   const body = document.createElement('div');
   const chips = (label, opts, cur, pick) => {
     const l = document.createElement('div'); l.className = 'lbl'; l.textContent = label;
@@ -146,12 +147,17 @@ function showSetup(game) {
     });
     body.append(l, box);
   };
-  if (g.variants) chips('Варіант', [['podkidnoy', 'Підкидний'], ['perevod', 'Переводний']], cfg.variant, v => { cfg.variant = v; });
+  if (g.variants) {
+    chips('Варіант', [['podkidnoy', 'Підкидний'], ['perevod', 'Переводний']], cfg.variant, v => { cfg.variant = v; });
+    const decks = Object.entries(durakE.DECKS).map(([size, d]) => [Number(size), `${d.label} · до ${d.max}`]);
+    // the player count depends on the deck, so redraw the panel
+    chips('Колода', decks, durakE.deckOf(cfg), v => { cfg.deck = v; setPref('cfg.' + game, cfg); showSetup(game); });
+  }
   const ns = [];
-  for (let k = g.minP; k <= g.maxP; k++) ns.push([k, String(k)]);
+  for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
   chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   const s = stat(game);
-  const c = () => (g.variants ? { variant: cfg.variant } : {});
+  const c = () => (g.variants ? { variant: cfg.variant, deck: durakE.deckOf(cfg) } : {});
   showPanel({
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
@@ -286,7 +292,7 @@ function onRoomMsg(m) {
 function showLobby(m) {
   const g = GAMES[m.game], me = m.you, isHost = m.host === me;
   const body = document.createElement('div');
-  if (m.cfg.variant) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = m.cfg.variant === 'perevod' ? 'Переводний' : 'Підкидний'; body.appendChild(l); }
+  if (m.cfg.variant) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `${m.cfg.variant === 'perevod' ? 'Переводний' : 'Підкидний'} · ${durakE.DECKS[durakE.deckOf(m.cfg)].label}`; body.appendChild(l); }
   if (m.game === 'mafia') { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Від ${m.cfg.min} до ${m.cfg.max} гравців. Вільні місця можна заповнити ботами.`; body.appendChild(l); }
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {
@@ -350,7 +356,7 @@ function findMatch(game, cfg) {
     textEl.textContent = `Шукаємо суперника… ${s} с` + (s >= 20 ? '\nПоки нікого немає — можна зіграти з ботом.' : '');
   };
   upd(); waitTimer = setInterval(upd, 1000);
-  sess.ws = openSocket(`/ws/match?game=${game}&variant=${cfg.variant || ''}`, {}, m => {
+  sess.ws = openSocket(`/ws/match?game=${game}&variant=${cfg.variant || ''}&deck=${cfg.deck || ''}`, {}, m => {
     if (m.type === 'matched') joinRoom(m.room, Object.assign({ game, auto: 2 }, cfg));
     else if (m.type === 'error') { leave(); showPanel({ kind: 'error', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] }); }
   }, e => {

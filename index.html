@@ -48,6 +48,10 @@ header h1 span{color:var(--gold)}
 .opp .cn{margin-top:4px;display:flex;justify-content:center;align-items:center;gap:2px;font-weight:600}
 .opp .cn span{margin-left:4px}
 .opp .bd{font-size:11px;color:var(--muted);min-height:14px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opps.many{flex-wrap:wrap;gap:4px}
+.opps.many .opp{flex:1 1 64px;max-width:90px;padding:3px 2px 4px;font-size:11px}
+.opps.many .opp .cn{margin-top:2px}
+.opps.many .opp .bd{font-size:10px;min-height:12px;margin-top:1px}
 .card.tiny{--cw:14px;border-radius:3px;box-shadow:inset 0 0 0 1px #fffdf7,inset 0 0 0 2px #b3201f}
 .cn .card.tiny + .card.tiny{margin-left:-8px}
 .dmain{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0;padding:0 12px}
@@ -180,6 +184,6 @@ header h1 span{color:var(--gold)}
 </div>
 <div id="toast"></div>
 <div class="overlay" id="ov" hidden><div class="panel" id="ovPanel"></div></div>
-<script type="module" src="js/app.js?v=8"></script>
+<script type="module" src="js/app.js?v=9"></script>
 </body>
 </html>

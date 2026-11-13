@@ -34,15 +34,19 @@ function run(E, cfg, n, games, check) {
 const durakCheck = G => {
   const total = G.deck.length + G.out + G.hands.reduce((s, h) => s + h.length, 0) +
     G.table.reduce((s, p) => s + (p.d ? 2 : 1), 0);
-  if (total !== 36) throw new Error('card count ' + total);
+  if (total !== G.total) throw new Error('card count ' + total + ' of ' + G.total);
+  const ids = new Set(G.hands.flat().map(c => c.id));
+  if (ids.size !== G.hands.flat().length) throw new Error('duplicate card id in hands');
   if (G.table.length > 6) throw new Error('table > 6');
   if (!G.over && G.defender === G.attacker) throw new Error('attacker = defender');
 };
 
-for (const variant of ['podkidnoy', 'perevod']) {
-  for (let n = 2; n <= 6; n++) {
-    const r = run(durak, { variant }, n, 400, durakCheck);
-    console.log(`durak ${variant} n=${n}: ${r.games} games, avg ${Math.round(r.steps / r.games)} moves, transfers ${r.transfers}, losers`, r.outcomes);
+for (const deck of [36, 52, 72]) {
+  for (const variant of ['podkidnoy', 'perevod']) {
+    for (const n of [2, 3, 4, 6, 8, 10, 12].filter(k => k <= durak.DECKS[deck].max)) {
+      const r = run(durak, { variant, deck }, n, 200, durakCheck);
+      console.log(`durak ${deck} ${variant} n=${n}: avg ${Math.round(r.steps / r.games)} moves, transfers ${r.transfers}, draws ${r.outcomes['-1'] || 0}`);
+    }
   }
 }
 for (let n = 2; n <= 4; n++) {

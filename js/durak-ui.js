@@ -142,6 +142,7 @@ function draw() {
   const v = V, me = v.seat, n = v.players.length;
   // opponents
   const op = $('dOpps'); op.innerHTML = '';
+  op.classList.toggle('many', n > 5);
   for (let k = 1; k < n; k++) {
     const i = (me + k) % n, p = v.players[i];
     const box = document.createElement('div');
@@ -149,7 +150,7 @@ function draw() {
     box.className = 'opp' + (p.done ? ' done' : '') + (live && i === v.defender ? ' def' : '') + (live && i === v.attacker ? ' att' : '');
     const nmEl = document.createElement('div'); nmEl.className = 'nm'; nmEl.textContent = nm(i);
     const cn = document.createElement('div'); cn.className = 'cn';
-    const shown = Math.min(p.count, n <= 2 ? 8 : 3);
+    const shown = Math.min(p.count, n <= 2 ? 8 : n > 5 ? 1 : 3);
     for (let j = 0; j < shown; j++) cn.appendChild(backEl('tiny'));
     const num = document.createElement('span'); num.textContent = p.count; cn.appendChild(num);
     let badge = p.done ? '🏁 вийшов' : p.passed ? '✓ пас' : i === v.defender ? (v.taking ? '✋ бере' : '🛡 захист') : i === v.attacker ? '⚔ хід' : '';
@@ -168,7 +169,7 @@ function draw() {
     const e = document.createElement('div'); e.className = 'empty'; e.textContent = E.SUITS[v.trump]; e.style.color = tcol; dk.appendChild(e);
   }
   $('infoText').innerHTML = `Колода: <b>${v.deck}</b><br>Козир: <b style="color:${tcol}">${E.SUITS[v.trump]}</b> · Бито: <b>${v.out}</b>` +
-    (v.variant === 'perevod' ? '<br><span class="tag">переводний</span>' : '');
+    `<br><span class="tag">${v.variant === 'perevod' ? 'переводний' : 'підкидний'} · ${E.DECKS[v.deckSize || 36].label}</span>`;
   // table
   const tb = $('table'); tb.innerHTML = '';
   const canTarget = !busy && !v.over && me === v.defender && !v.taking && E.undefended(v) > 1;

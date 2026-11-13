@@ -42,7 +42,7 @@ const durakCheck = G => {
 };
 
 for (const deck of [36, 52, 72]) {
-  for (const variant of ['podkidnoy', 'perevod']) {
+  for (const variant of ['podkidnoy', 'perevod', 'both']) {
     for (const n of [2, 3, 4, 6, 8, 10, 12].filter(k => k <= durak.DECKS[deck].max)) {
       const r = run(durak, { variant, deck }, n, 200, durakCheck);
       console.log(`durak ${deck} ${variant} n=${n}: avg ${Math.round(r.steps / r.games)} moves, transfers ${r.transfers}, draws ${r.outcomes['-1'] || 0}`);

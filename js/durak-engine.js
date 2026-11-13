@@ -12,6 +12,14 @@ export const DECKS = {
   72: { from: R('6'), copies: 2, max: 12, label: '2 × 36' },
 };
 export const deckOf = cfg => (cfg && DECKS[cfg.deck] ? Number(cfg.deck) : 36);
+// podkidnoy = throw-in only, perevod = transfer only, both = throw-in and transfer
+export const VARIANTS = {
+  podkidnoy: { label: 'Підкидний', throwIn: true, transfer: false },
+  perevod: { label: 'Переводний', throwIn: false, transfer: true },
+  both: { label: 'Підкидний + переводний', throwIn: true, transfer: true },
+};
+export const variantOf = cfg => (cfg && VARIANTS[cfg.variant] ? cfg.variant : 'podkidnoy');
+const rule = S => VARIANTS[S.variant] || VARIANTS.podkidnoy;
 export const delay = { bot: 750, advance: 900 };
 
 function rnd(n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
@@ -32,7 +40,7 @@ export function nextActive(S, i) {
 }
 export function canLead(S, seat) { return !S.over && !S.table.length && seat === S.attacker; }
 export function canAdd(S, seat, c) {
-  if (S.over || !S.table.length || seat === S.defender || isDone(S, seat)) return false;
+  if (S.over || !rule(S).throwIn || !S.table.length || seat === S.defender || isDone(S, seat)) return false;
   if (S.table.length >= limit(S) || undefended(S) >= cnt(S, S.defender)) return false;
   return S.table.some(p => p.a.r === c.r || (p.d && p.d.r === c.r));
 }
@@ -43,14 +51,14 @@ export function coverTargets(S, seat, c) {
   return out;
 }
 export function canTransfer(S, seat, c) {
-  if (S.over || S.variant !== 'perevod' || seat !== S.defender || S.taking || !S.table.length) return false;
+  if (S.over || !rule(S).transfer || seat !== S.defender || S.taking || !S.table.length) return false;
   if (!S.table.every(p => !p.d && p.a.r === c.r)) return false;
   const next = nextActive(S, seat);
   return S.table.length + 1 <= limit(S) && cnt(S, next) >= S.table.length + 1;
 }
-// A thrower may say «Бито» (or «Пас» while the defender takes)
+// A thrower may say «Бито» (or «Пас» while the defender takes); without throw-in the bout closes by itself
 export function canPass(S, seat) {
-  return !S.over && S.table.length > 0 && seat !== S.defender && !isDone(S, seat) && !hasPassed(S, seat) &&
+  return !S.over && rule(S).throwIn && S.table.length > 0 && seat !== S.defender && !isDone(S, seat) && !hasPassed(S, seat) &&
     (S.taking || !undefended(S));
 }
 
@@ -63,7 +71,7 @@ export function create(cfg, players) {
   shuffle(deck);
   const n = players.length;
   const G = {
-    game: 'durak', variant: cfg && cfg.variant === 'perevod' ? 'perevod' : 'podkidnoy',
+    game: 'durak', variant: variantOf(cfg),
     deckSize: size, total: deck.length,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     deck, trump: deck[0].s, trumpCard: deck[0], hands: players.map(() => []), table: [],
@@ -203,5 +211,6 @@ export function botAction(G, seat) {
   if (G.passed[seat] || (!G.taking && undefended(G))) return null;   // let the defender answer first
   const add = hand.filter(c => canAdd(G, seat, c))
     .filter(c => !G.deck.length || (c.s !== G.trump && c.r <= R('Д'))).sort(by)[0];
-  return add ? { t: 'play', id: add.id } : { t: 'pass' };
+  if (add) return { t: 'play', id: add.id };
+  return canPass(G, seat) ? { t: 'pass' } : null;
 }

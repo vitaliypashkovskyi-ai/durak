@@ -26,7 +26,7 @@ export default {
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('Ігри server', { headers: CORS });
     if (url.pathname === '/ws/match') {
       const game = url.searchParams.get('game') || 'durak';
-      const variant = url.searchParams.get('variant') === 'perevod' ? 'perevod' : '';
+      const variant = game === 'durak' ? durak.variantOf({ variant: url.searchParams.get('variant') }) : '';
       if (!ENGINES[game] || NO_RANDOM.has(game)) return new Response('bad game', { status: 400 });
       const deck = game === 'durak' ? durak.deckOf({ deck: url.searchParams.get('deck') }) : '';
       return env.LOBBY.get(env.LOBBY.idFromName(`${game}:${variant}:${deck}`)).fetch(req);
@@ -132,7 +132,7 @@ function roomConfig(c) {
   if (!c || !ENGINES[c.game]) return null;
   const cfg = { game: c.game, min: MIN[c.game], max: MAX[c.game] };
   if (c.game === 'durak') {
-    cfg.variant = c.variant === 'perevod' ? 'perevod' : 'podkidnoy';
+    cfg.variant = durak.variantOf(c);
     cfg.deck = durak.deckOf(c);
     cfg.max = durak.DECKS[cfg.deck].max;
   }

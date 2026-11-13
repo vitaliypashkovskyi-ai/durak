@@ -161,7 +161,7 @@ function showSetup(game) {
     body.append(l, box);
   };
   if (g.variants) {
-    chips('Варіант', [['podkidnoy', 'Підкидний'], ['perevod', 'Переводний']], cfg.variant, v => { cfg.variant = v; });
+    chips('Варіант', Object.entries(durakE.VARIANTS).map(([k, x]) => [k, x.label]), durakE.variantOf(cfg), v => { cfg.variant = v; });
     const decks = Object.entries(durakE.DECKS).map(([size, d]) => [Number(size), `${d.label} · до ${d.max}`]);
     // the player count depends on the deck, so redraw the panel
     chips('Колода', decks, durakE.deckOf(cfg), v => { cfg.deck = v; setPref('cfg.' + game, cfg); showSetup(game); });
@@ -170,7 +170,7 @@ function showSetup(game) {
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
   chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   const s = stat(game);
-  const c = () => (g.variants ? { variant: cfg.variant, deck: durakE.deckOf(cfg) } : {});
+  const c = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) } : {});
   showPanel({
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
@@ -305,7 +305,7 @@ function onRoomMsg(m) {
 function showLobby(m) {
   const g = GAMES[m.game], me = m.you, isHost = m.host === me;
   const body = document.createElement('div');
-  if (m.cfg.variant) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `${m.cfg.variant === 'perevod' ? 'Переводний' : 'Підкидний'} · ${durakE.DECKS[durakE.deckOf(m.cfg)].label}`; body.appendChild(l); }
+  if (m.cfg.variant) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `${durakE.VARIANTS[durakE.variantOf(m.cfg)].label} · ${durakE.DECKS[durakE.deckOf(m.cfg)].label}`; body.appendChild(l); }
   if (m.game === 'mafia') { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Від ${m.cfg.min} до ${m.cfg.max} гравців. Вільні місця можна заповнити ботами.`; body.appendChild(l); }
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {

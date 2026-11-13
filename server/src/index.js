@@ -9,14 +9,15 @@ import * as battle from '../../js/battle-engine.js';
 import * as mafia from '../../js/mafia-engine.js';
 import * as thousand from '../../js/thousand-engine.js';
 import * as spy from '../../js/spy-engine.js';
+import * as goat from '../../js/goat-engine.js';
 import { Host } from '../../js/host.js';
 import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia, thousand, spy };
-const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3 };
-const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10 };   // durak: depends on the deck, see roomConfig
-const NO_RANDOM = new Set(['mafia', 'thousand', 'spy']);
+const ENGINES = { durak, battle, mafia, thousand, spy, goat };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4 };   // durak: depends on the deck, see roomConfig
+const NO_RANDOM = new Set(['mafia', 'thousand', 'spy', 'goat']);
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
 const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
@@ -51,6 +52,12 @@ export default {
       const user = await authenticate({ init: body.init }, env);
       if (!user) return json({ error: 'not telegram' }, 401);
       return json(await statsCall(env, '/profile', { id: user.id }));
+    }
+    if (url.pathname === '/api/daily' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
+      return json(await statsCall(env, '/daily', { id: user.id, name: user.name }));
     }
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('Ігри server', { headers: CORS });
     if (url.pathname === '/ws/match') {
@@ -369,6 +376,8 @@ export class Room {
         const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
         res = G.winner === team ? 'win' : 'lose';
         don = team === 'mafia';
+      } else if (G.game === 'goat') {
+        res = G.winner === i % 2 ? 'win' : 'lose';
       } else if (G.game === 'spy') {
         res = G.winner === (i === G.spy ? 'spy' : 'town') ? 'win' : 'lose';
         don = i === G.spy;   // counted as «won as the spy» for the badge

@@ -10,6 +10,8 @@ import * as thousandE from './thousand-engine.js';
 import * as thousandUI from './thousand-ui.js';
 import * as spyE from './spy-engine.js';
 import * as spyUI from './spy-ui.js';
+import * as goatE from './goat-engine.js';
+import * as goatUI from './goat-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -26,7 +28,8 @@ const GAMES = {
 };
 GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3, noRandom: true };
 GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, defP: 5, noRandom: true };
-const SOON = [['🐐', 'Козел'], ['🎴', 'Свара'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
+GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2', E: goatE, UI: goatUI, minP: 4, maxP: 4, noRandom: true };
+const SOON = [['🎴', 'Свара'], ['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
 
 if (tg) { try { tg.ready(); tg.expand(); tg.setHeaderColor('#143a27'); tg.setBackgroundColor('#143a27'); } catch (e) {} }
 
@@ -39,7 +42,7 @@ function stat(game) {
   return s && typeof s.win === 'number' ? s : { win: 0, lose: 0, draw: 0 };
 }
 function addStat(game, res) { const s = stat(game); s[res] = (s[res] || 0) + 1; setPref('stats.' + game, s); }
-const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍' };
+const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍', goat: '🐐' };
 function updStats(game) { const s = stat(game); $('stats').textContent = `🏆 ${s.win} · ${LOSE_ICON[game] || '✖'} ${s.lose}`; }
 
 // ---------- session ----------
@@ -95,11 +98,19 @@ function showHub() {
     row.appendChild(b);
   }
   top.appendChild(row);
+  const row2 = document.createElement('div');
+  row2.className = 'hubrow';
   const rateBtn = document.createElement('button');
   rateBtn.className = 'hubact';
-  rateBtn.textContent = '🏆 Рейтинг гравців';
+  rateBtn.textContent = '🏆 Рейтинг';
   rateBtn.onclick = () => showRating('week');
-  top.appendChild(rateBtn);
+  const giftBtn = document.createElement('button');
+  const claimedToday = pref('dailyDay', '') === new Date().toLocaleDateString('en-CA');
+  giftBtn.className = 'hubact' + (inTelegram && !claimedToday ? ' gift' : '');
+  giftBtn.textContent = '🎁 Бонус дня';
+  giftBtn.onclick = claimDaily;
+  row2.append(rateBtn, giftBtn);
+  top.appendChild(row2);
   const grid = h.querySelector('.hubgrid');
   for (const [id, g] of Object.entries(GAMES)) {
     const b = document.createElement('button');
@@ -258,6 +269,29 @@ const genCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b =>
 const serverBase = () => new URLSearchParams(location.search).get('server') || SERVER;
 const httpBase = () => serverBase().replace(/^ws/, 'http');
 
+// ---------- daily bonus ----------
+async function claimDaily() {
+  if (!inTelegram) {
+    return showPanel({ kind: 'daily', icon: '🎁', title: 'Бонус дня', text: 'Щоденний бонус — для гравців у Telegram. Відкрийте гру в @IgryUA_bot.', buttons: [{ text: 'Зрозуміло', sec: true, fn: hidePanel }] });
+  }
+  showPanel({ kind: 'daily', icon: '🎁', title: 'Бонус дня', text: 'Відкриваємо…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  let r;
+  try {
+    r = await (await fetch(`${httpBase()}/api/daily`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) })).json();
+  } catch (e) { r = null; }
+  if (!r || !r.ok) return showPanel({ kind: 'daily', icon: '🎁', title: 'Бонус дня', text: 'Не вдалося. Спробуйте пізніше.', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  setPref('dailyDay', new Date().toLocaleDateString('en-CA'));
+  document.querySelectorAll('.hubact.gift').forEach(b => b.classList.remove('gift'));
+  const fire = '🔥'.repeat(Math.min(r.streak, 7));
+  if (r.claimed) { sfx('win'); haptic('success'); }
+  showPanel({
+    kind: 'daily', icon: r.claimed ? '🎁' : '⏳', title: r.claimed ? `+${r.bonus} очок!` : 'Сьогодні вже отримано',
+    text: `Серія: ${r.streak} ${r.streak === 1 ? 'день' : r.streak < 5 ? 'дні' : 'днів'} ${fire}\n` +
+      `Завтра: +${r.next}${r.next < 7 ? ' (до +7 за тиждень поспіль)' : ''}\nУсього очок: ${r.points}`,
+    buttons: [{ text: '🏆 Рейтинг', fn: () => showRating('week') }, { text: 'Закрити', sec: true, fn: hidePanel }],
+  });
+}
+
 // ---------- rating ----------
 async function showRating(period) {
   showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
@@ -281,8 +315,23 @@ async function showRating(period) {
     line(`${me.points} очок · ${me.wins} перемог з ${me.games}` + (me.rank ? ` · місце ${me.rank}` : ''));
     line(`Цього тижня: ${me.week} очок`);
     if (me.level.next) line(`До «${me.level.next.name}»: ще ${me.level.next.at - me.points} очок`, 'sub');
-    if (me.badges.length) line(me.badges.join(' · '), 'badges');
+    if (me.daily) line(`🔥 Серія бонусів: ${me.daily.streak} дн.` + (me.daily.available ? ` · сьогодні чекає +${me.daily.next}` : ''), 'sub');
     body.appendChild(box);
+    if (me.achievements) {
+      const done = me.achievements.filter(a => a.done).length;
+      const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Досягнення: ${done} з ${me.achievements.length}`;
+      const grid = document.createElement('div'); grid.className = 'ach';
+      me.achievements.forEach(a => {
+        const d = document.createElement('div');
+        d.className = 'achi' + (a.done ? ' done' : '');
+        const ic = document.createElement('span'); ic.className = 'ai'; ic.textContent = a.icon;
+        const nmEl = document.createElement('b'); nmEl.textContent = a.name;
+        const how = document.createElement('small'); how.textContent = a.done ? a.how : `${a.how} (${a.have}/${a.goal})`;
+        d.append(ic, nmEl, how);
+        grid.appendChild(d);
+      });
+      body.append(l, grid);
+    }
   } else if (!inTelegram) {
     add('p', 'muted', 'Свої очки побачите, коли відкриєте гру в Telegram (@IgryUA_bot).');
   }

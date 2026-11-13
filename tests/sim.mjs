@@ -4,6 +4,7 @@ import * as battle from '../js/battle-engine.js';
 import * as mafia from '../js/mafia-engine.js';
 import * as thousand from '../js/thousand-engine.js';
 import * as spy from '../js/spy-engine.js';
+import * as goat from '../js/goat-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -97,5 +98,20 @@ for (let n = 5; n <= 12; n++) {
     const r = run(spy, {}, n, 200, spyCheck);
     console.log(`spy n=${n}: ${r.games} games, winners`, r.outcomes);
   }
+}
+{
+  let deals = 0, eggs = 0, gains = {};
+  const goatCheck = G => {
+    const ids = new Set(G.hands.flat().map(c => c.id));
+    if (ids.size !== G.hands.flat().length) throw new Error('goat duplicate card');
+    if (G.phase === 'play' && G.hands.flat().length + G.trick.length + (G.tricks[0] + G.tricks[1]) * 4 !== 36) throw new Error('goat card count');
+    if (G.phase === 'score' && G.result && !G.result.__seen) {
+      G.result.__seen = true; deals++;
+      if (G.taken[0] + G.taken[1] !== 120) throw new Error('goat points ' + (G.taken[0] + G.taken[1]));
+      if (G.result.eggs) eggs++; else gains[G.result.gain] = (gains[G.result.gain] || 0) + 1;
+    }
+  };
+  const r = run(goat, {}, 4, 300, goatCheck);
+  console.log(`goat: ${r.games} games, avg ${Math.round(deals / r.games)} deals, eggs ${eggs}, gains`, gains, 'winners (team)', r.outcomes);
 }
 console.log('OK');

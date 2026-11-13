@@ -156,6 +156,12 @@ header{gap:6px}
 .locs .loc.cur{background:var(--gold);font-weight:700}
 .locs.pick .chip{font-size:13px;padding:6px 9px}
 
+/* goat */
+.opp.partner{background:rgba(47,111,214,.3)}
+.gsc{font-size:16px;font-weight:700;color:#fff;text-align:center}
+#gScore{flex-direction:column;align-items:center;gap:2px}
+.tslot.ours .tl{color:#9fc3ff}
+
 /* thousand */
 .tscore{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:4px 10px 0}
 .tsc.me{color:#fff;font-weight:600}
@@ -209,6 +215,14 @@ header{gap:6px}
 .mecard .lvl{font-size:18px;font-weight:700}
 .mecard .sub{color:#666;font-size:13px}
 .mecard .badges{margin-top:2px;font-weight:600}
+.ach{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:6px 0;text-align:left}
+.achi{background:#f1ede2;border-radius:10px;padding:6px 8px;opacity:.55;display:grid;grid-template-columns:auto 1fr;column-gap:6px;align-items:center}
+.achi.done{opacity:1;background:#fff3c4}
+.achi .ai{font-size:20px;grid-row:span 2}
+.achi b{font-size:12px}
+.achi small{font-size:10.5px;color:#666;line-height:1.2}
+.hubact.gift{background:linear-gradient(90deg,#c0392b,#e67e22);animation:glow 1.6s ease-in-out infinite alternate}
+@keyframes glow{to{filter:brightness(1.25)}}
 .rules{max-height:55vh;overflow:auto;text-align:left}
 </style>
 </head>
@@ -233,21 +247,23 @@ header{gap:6px}
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=18",
-  "./js/host.js": "./js/host.js?v=18",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=18",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=18",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=18",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=18",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=18",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=18",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=18",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=18",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=18",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=18",
-  "./js/spy-data.js": "./js/spy-data.js?v=18"
+  "./js/common.js": "./js/common.js?v=19",
+  "./js/host.js": "./js/host.js?v=19",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=19",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=19",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=19",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=19",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=19",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=19",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=19",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=19",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=19",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=19",
+  "./js/spy-data.js": "./js/spy-data.js?v=19",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=19",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=19"
 } }
 </script>
-<script type="module" src="js/app.js?v=18"></script>
+<script type="module" src="js/app.js?v=19"></script>
 </body>
 </html>

@@ -43,8 +43,47 @@ export function topText(rows, title) {
 const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia' };
 
 export async function handleUpdate(update, env, makeRoom) {
+  if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
   const msg = update.message;
   if (!msg || typeof msg.text !== 'string' || !msg.text.startsWith('/')) return;
+  return handleCommand(msg, env, makeRoom);
+}
+
+// The game list as buttons: pressing one gathers a room right away.
+const menuKeyboard = withPlay => ({
+  inline_keyboard: [
+    ...(withPlay ? [[{ text: '🎮 Відкрити ігри', web_app: { url: APP_URL } }]] : []),
+    [{ text: '🃏 Дурень', callback_data: 'new:durak' }, { text: '🚢 Морський бій', callback_data: 'new:battle' }],
+    [{ text: '🎭 Мафія', callback_data: 'new:mafia' }, { text: '🏆 Топ тижня', callback_data: 'top' }],
+  ],
+});
+const MENU_TEXT = '🎲 <b>Ігри UA</b> — оберіть гру, і бот збере кімнату. Хто натисне «Приєднатися», зайде до вас.';
+
+async function gatherRoom(env, makeRoom, chatId, from, game) {
+  const code = await makeRoom({ game });
+  const g = GAMES[game], who = esc((from && from.first_name) || 'Хтось');
+  return tg(env, 'sendMessage', {
+    chat_id: chatId, parse_mode: 'HTML',
+    text: `${g.icon} <b>${who}</b> збирає гру «${g.title}»!\nНатисніть кнопку, щоб приєднатися 👇`,
+    reply_markup: { inline_keyboard: [[{ text: `▶ Приєднатися (${g.title})`, url: joinUrl(code) }]] },
+  });
+}
+
+export async function handleCallback(q, env, makeRoom) {
+  const chat = q.message && q.message.chat;
+  if (!chat) return tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
+  if (q.data === 'top') {
+    await tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
+    const rows = await statsCall(env, '/top?period=week');
+    return tg(env, 'sendMessage', { chat_id: chat.id, parse_mode: 'HTML', text: topText(rows, '🏆 <b>Топ гравців тижня</b>') });
+  }
+  const game = typeof q.data === 'string' && q.data.startsWith('new:') ? q.data.slice(4) : null;
+  if (!GAMES[game]) return tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
+  await tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text: `${GAMES[game].icon} Збираю кімнату…` });
+  return gatherRoom(env, makeRoom, chat.id, q.from, game);
+}
+
+async function handleCommand(msg, env, makeRoom) {
   const [full] = msg.text.trim().split(/\s+/);
   const [cmdRaw, at] = full.split('@');
   if (at && at.toLowerCase() !== BOT.toLowerCase()) return;   // a command for another bot
@@ -56,22 +95,12 @@ export async function handleUpdate(update, env, makeRoom) {
     const rows = await statsCall(env, '/top?period=week');
     return reply(topText(rows, '🏆 <b>Топ гравців тижня</b>'));
   }
-  if (chat.type === 'private') {
-    if (['/start', '/play', '/help', '/igry'].includes(cmd)) {
-      return reply('🎲 <b>Ігри UA</b> — Дурень, Морський бій і Мафія з друзями прямо в Telegram.\n\n' +
-        'Натисніть «Грати», щоб почати. У групі можна написати /durak, /battle або /mafia — і всі охочі зайдуть в одну кімнату.',
-      { reply_markup: { inline_keyboard: [[{ text: '🎮 Грати', web_app: { url: APP_URL } }]] } });
-    }
-    return;
-  }
-  // group or supergroup
-  if (cmd === '/igry' || cmd === '/games' || cmd === '/help' || cmd === '/start') {
-    return reply('🎲 Зібрати гру тут:\n/durak — 🃏 Дурень\n/battle — 🚢 Морський бій\n/mafia — 🎭 Мафія\n/top — 🏆 топ тижня');
+  const priv = chat.type === 'private';
+  if (['/start', '/play', '/help', '/igry', '/games', '/menu'].includes(cmd)) {
+    // web_app buttons work only in private chats
+    return reply(MENU_TEXT, { reply_markup: menuKeyboard(priv) });
   }
   const game = GROUP_CMDS[cmd];
   if (!game) return;
-  const code = await makeRoom({ game });
-  const g = GAMES[game], who = esc((msg.from && msg.from.first_name) || 'Хтось');
-  return reply(`${g.icon} <b>${who}</b> збирає гру «${g.title}»!\nНатисніть кнопку, щоб приєднатися 👇`,
-    { reply_markup: { inline_keyboard: [[{ text: `▶ Приєднатися (${g.title})`, url: joinUrl(code) }]] } });
+  return gatherRoom(env, makeRoom, chat.id, msg.from, game);
 }

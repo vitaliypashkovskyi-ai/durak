@@ -1,9 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="uk">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Ð†Ð³Ñ€Ð¸</title>
+<title>Ігри</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 :root{
@@ -104,16 +104,44 @@ header h1 span{color:var(--gold)}
 .grid.big .cell{font-size:15px}
 .cell.ship{background:#a7b2bb}
 .cell.miss{background:#1d5684}
-.cell.miss::after{content:"â€¢";color:#cfe3f5}
+.cell.miss::after{content:"•";color:#cfe3f5}
 .cell.hit{background:#e0533d}
-.cell.hit::after{content:"âœ•"}
+.cell.hit::after{content:"✕"}
 .cell.sunk{background:#6b1d14}
-.cell.sunk::after{content:"âœ•";color:#ffb4a8}
+.cell.sunk::after{content:"✕";color:#ffb4a8}
 .grid.aim .cell.free{cursor:pointer}
 .grid.aim{box-shadow:0 0 0 2px var(--gold)}
 .brow{display:flex;gap:10px;justify-content:center;min-height:8px}
 .brow button{border:0;border-radius:12px;padding:10px 18px;font-size:15px;font-weight:600;color:#fff;background:var(--blue);cursor:pointer}
 .brow button.sec{background:rgba(255,255,255,.18)}
+
+/* mafia */
+#game.g-mafia{transition:background .6s}
+#game.nightmode{background:rgba(5,10,30,.55)}
+.mbar{display:flex;justify-content:space-between;align-items:center;padding:6px 14px 2px;font-weight:700;font-size:16px}
+#mTimer{font-variant-numeric:tabular-nums;color:var(--gold)}
+.mrole{margin:4px 12px;padding:8px 12px;background:rgba(0,0,0,.25);border-radius:12px;font-size:14px}
+.mextra{font-size:12px;color:var(--muted);margin-top:3px}
+.mplayers{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px;padding:6px 12px}
+.mp{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border-radius:12px;border:2px solid transparent;background:rgba(255,255,255,.1);color:#fff;font:inherit;min-width:0}
+.mp .av{font-size:22px;line-height:1.1}
+.mp .pn{font-size:12px;font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp .ps{font-size:11px;color:var(--muted);min-height:13px}
+.mp.can{cursor:pointer;background:rgba(255,255,255,.18)}
+.mp.sel{border-color:var(--gold)}
+.mp.me{background:rgba(47,111,214,.35)}
+.mp.mate{border-color:#ff8a80}
+.mp.dead{opacity:.45}
+.mp:disabled{cursor:default}
+#mBtns button{padding:8px 14px;font-size:14px}
+.mchat{flex:1;min-height:70px;overflow:auto;margin:4px 12px;padding:6px 10px;background:rgba(0,0,0,.25);border-radius:12px;font-size:13px;line-height:1.4;user-select:text;-webkit-user-select:text}
+.msg{margin:2px 0;word-wrap:break-word}
+.msg.sys{color:#cfe8d6;font-style:italic}
+.msg.mafia{color:#ffb4a8}
+.msay{display:flex;gap:6px;padding:4px 12px 12px}
+.msay input{flex:1;min-width:0;border:0;border-radius:12px;padding:10px 12px;font-size:15px;user-select:text;-webkit-user-select:text}
+.msay input:disabled{opacity:.5}
+.msay button{border:0;border-radius:12px;padding:0 16px;font-size:18px;background:var(--blue);color:#fff;cursor:pointer}
 
 /* toast + panel */
 #toast{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%) scale(.9);background:rgba(0,0,0,.75);padding:10px 18px;border-radius:12px;font-size:17px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:90vw;text-align:center;z-index:20}
@@ -142,16 +170,16 @@ header h1 span{color:var(--gold)}
 <body>
 <div id="app">
   <header>
-    <button class="hbtn" id="backBtn" hidden aria-label="ÐÐ°Ð·Ð°Ð´">â†</button>
-    <h1 id="title">Ð†Ð³Ñ€Ð¸ <span>â™¦</span></h1>
+    <button class="hbtn" id="backBtn" hidden aria-label="Назад">←</button>
+    <h1 id="title">Ігри <span>♦</span></h1>
     <span class="stat" id="stats"></span>
-    <button class="hbtn" id="rulesBtn" hidden aria-label="ÐŸÑ€Ð°Ð²Ð¸Ð»Ð°">?</button>
+    <button class="hbtn" id="rulesBtn" hidden aria-label="Правила">?</button>
   </header>
   <section id="hub"></section>
   <section id="game" hidden></section>
 </div>
 <div id="toast"></div>
 <div class="overlay" id="ov" hidden><div class="panel" id="ovPanel"></div></div>
-<script type="module" src="js/app.js?v=5"></script>
+<script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

@@ -5,6 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Ігри</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+// Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
+// with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
+(function () {
+  var PAGE_VERSION = 21;
+  try {
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !(j.v > PAGE_VERSION)) return;
+        var u = new URL(location.href);
+        if (u.searchParams.get('_v') === String(j.v)) return;   // already tried this version
+        u.searchParams.set('_v', j.v);
+        location.replace(u.toString());
+      })
+      .catch(function () {});
+  } catch (e) {}
+})();
+</script>
 <style>
 :root{
   --felt:#21603e; --felt2:#143a27; --ink:#fff; --muted:rgba(255,255,255,.72);
@@ -272,23 +291,23 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=20",
-  "./js/host.js": "./js/host.js?v=20",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=20",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=20",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=20",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=20",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=20",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=20",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=20",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=20",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=20",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=20",
-  "./js/spy-data.js": "./js/spy-data.js?v=20",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=20",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=20"
+  "./js/common.js": "./js/common.js?v=21",
+  "./js/host.js": "./js/host.js?v=21",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=21",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=21",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=21",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=21",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=21",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=21",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=21",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=21",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=21",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=21",
+  "./js/spy-data.js": "./js/spy-data.js?v=21",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=21",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=21"
 } }
 </script>
-<script type="module" src="js/app.js?v=20"></script>
+<script type="module" src="js/app.js?v=21"></script>
 </body>
 </html>

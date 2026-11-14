@@ -34,16 +34,16 @@ const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія',
 const GAMES = {
   durak: { title: 'Дурень', icon: '🃏', sub: '2–12 гравців', E: durakE, UI: durakUI, minP: 2, maxP: 12, variants: true },
   battle: { title: 'Морський бій', icon: '🚢', sub: '2–4 гравці', E: battleE, UI: battleUI, minP: 2, maxP: 4 },
-  mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7, noRandom: true },
+  mafia: { title: 'Мафія', icon: '🎭', sub: '5–12 гравців', E: mafiaE, UI: mafiaUI, minP: 5, maxP: 12, defP: 7 },
 };
-GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3, noRandom: true };
-GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, defP: 5, noRandom: true };
-GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2', E: goatE, UI: goatUI, minP: 4, maxP: 4, noRandom: true };
-GAMES.rpoker = { title: 'Розписний покер', icon: '🎯', sub: '2–8 гравців', E: rpokerE, UI: rpokerUI, minP: 2, maxP: 8, defP: 4, noRandom: true };
-GAMES.svara = { title: 'Свара', icon: '🎴', sub: '2–8 гравців', E: svaraE, UI: svaraUI, minP: 2, maxP: 8, defP: 4, noRandom: true };
+GAMES.thousand = { title: 'Тисяча', icon: '🂡', sub: '3 гравці', E: thousandE, UI: thousandUI, minP: 3, maxP: 3 };
+GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравців', E: spyE, UI: spyUI, minP: 3, maxP: 10, defP: 5 };
+GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2', E: goatE, UI: goatUI, minP: 4, maxP: 4 };
+GAMES.rpoker = { title: 'Розписний покер', icon: '🎯', sub: '2–8 гравців', E: rpokerE, UI: rpokerUI, minP: 2, maxP: 8, defP: 4 };
+GAMES.svara = { title: 'Свара', icon: '🎴', sub: '2–8 гравців', E: svaraE, UI: svaraUI, minP: 2, maxP: 8, defP: 4 };
 GAMES.checkers = { title: 'Шашки', icon: '⚪', sub: '2 гравці', E: checkersE, UI: checkersUI, minP: 2, maxP: 2 };
 GAMES.nardy = { title: 'Нарди', icon: '🎲', sub: '2 гравці, довгі', E: nardyE, UI: nardyUI, minP: 2, maxP: 2 };
-GAMES.dice = { title: 'Кості', icon: '⚀', sub: '2–6 гравців, покер на костях', E: diceE, UI: diceUI, minP: 2, maxP: 6, defP: 3, noRandom: true };
+GAMES.dice = { title: 'Кості', icon: '⚀', sub: '2–6 гравців, покер на костях', E: diceE, UI: diceUI, minP: 2, maxP: 6, defP: 3 };
 const SOON = [];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
@@ -165,7 +165,8 @@ function showHub() {
   $('stats').textContent = '';
   if (tg && tg.BackButton) tg.BackButton.hide();
   const h = $('hub');
-  h.innerHTML = '<div class="hubtop"></div><div class="hubhead">Оберіть гру</div><div class="hubgrid"></div>';
+  h.innerHTML = '<div class="hubtop"></div><div class="hubhead">Оберіть гру <span id="online"></span></div><div class="hubgrid"></div>';
+  showOnline();
   const top = h.querySelector('.hubtop');
   const last = pref('lastRoom', null);
   if (last && Date.now() - last.t < 6 * 3600 * 1000) {
@@ -506,6 +507,7 @@ async function showRating(period) {
     if (me.level.next) line(`До «${me.level.next.name}»: ще ${me.level.next.at - me.points} очок`, 'sub');
     if (me.daily) line(`🔥 Серія бонусів: ${me.daily.streak} дн.` + (me.daily.available ? ` · сьогодні чекає +${me.daily.next}` : ''), 'sub');
     body.appendChild(box);
+    body.appendChild(notifySwitch(!me.mute && !!me.pm_ok));
     if (me.achievements) {
       const done = me.achievements.filter(a => a.done).length;
       const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Досягнення: ${done} з ${me.achievements.length}`;
@@ -542,6 +544,44 @@ async function showRating(period) {
   add('p', 'muted', 'Очки: перемога +3, нічия +1. Рахуються онлайн-ігри, де грають щонайменше двоє людей.');
   showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', body, buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
 }
+
+// Reminders from the bot (bonus of the day, the weekly tournament): on/off. Turning on asks Telegram
+// for permission to write, if the player has not given it yet.
+function notifySwitch(on) {
+  const b = document.createElement('button');
+  b.className = 'chip notify' + (on ? ' on' : '');
+  b.textContent = on ? '🔔 Нагадування від бота: увімкнено' : '🔕 Нагадування від бота: вимкнено';
+  const save = want => fetch(`${httpBase()}/api/notify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData, on: want }) })
+    .then(r => r.json()).then(r => { b.replaceWith(notifySwitch(!!(r.on && r.pm))); toast(r.on ? '🔔 Бот нагадає про бонус дня й турнір' : '🔕 Нагадування вимкнено'); })
+    .catch(() => toast('Не вдалося зберегти'));
+  b.onclick = () => {
+    if (on) return save(false);
+    if (tg && tg.requestWriteAccess) {
+      try { tg.requestWriteAccess(ok => { if (ok) save(true); else toast('Без дозволу бот не зможе написати'); }); return; } catch (e) {}
+    }
+    save(true);
+  };
+  return b;
+}
+
+// «🟢 N онлайн» in the menu: every open app pings once a minute.
+let ONLINE = 0;
+function showOnline() {
+  const el = $('online');
+  if (el) el.textContent = ONLINE >= 2 ? `· 🟢 ${ONLINE} онлайн` : '';
+}
+async function pingOnline() {
+  if (document.hidden) return;
+  try {
+    const body = inTelegram ? { init: tg.initData } : { gid: (hello().guest || {}).id };
+    const r = await (await fetch(`${httpBase()}/api/ping`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+    ONLINE = r.online || 0;
+    showOnline();
+  } catch (e) {}
+}
+setTimeout(pingOnline, 1500);
+setInterval(pingOnline, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pingOnline(); });
 
 // Weekly tournament: time left, prizes, my place, last week's winners.
 function tourBox(t) {
@@ -725,18 +765,22 @@ function findMatch(game, cfg) {
   leave();
   const sess = S = { kind: 'match', ws: null };
   const gen = NETGEN, t0 = Date.now(), g = GAMES[game];
+  let found = 1, want = 2;
   const p = showPanel({ kind: 'match', icon: g.icon, title: 'Пошук суперника', text: ' ', buttons: [
-    { text: '🤖 Грати з ботом', sec: true, fn: () => startLocal(game, cfg, 2) },
+    { text: '🤖 Грати з ботами', sec: true, fn: () => startLocal(game, cfg, g.defP || g.minP) },
     { text: 'Скасувати', sec: true, fn: () => { leave(); hidePanel(); } },
   ] });
   const textEl = p.querySelector('.muted');
   const upd = () => {
     const s = Math.floor((Date.now() - t0) / 1000);
-    textEl.textContent = `Шукаємо суперника… ${s} с` + (s >= 20 ? '\nПоки нікого немає — можна зіграти з ботом.' : '');
+    textEl.textContent = (want > 2 ? `Збираємо стіл: ${found} з ${want}… ${s} с` : `Шукаємо суперника… ${s} с`) +
+      (found >= 2 && want > 2 ? '\nЯкщо за пів хвилини більше нікого — почнемо, вільні місця займуть боти.' : '') +
+      (found < 2 && s >= 20 ? '\nПоки нікого немає — можна зіграти з ботами.' : '');
   };
   upd(); waitTimer = setInterval(upd, 1000);
-  sess.ws = openSocket(`/ws/match?game=${game}&variant=${cfg.variant || ''}&deck=${cfg.deck || ''}`, {}, m => {
-    if (m.type === 'matched') joinRoom(m.room, Object.assign({ game, auto: 2 }, cfg));
+  sess.ws = openSocket(`/ws/match?game=${game}&variant=${cfg.variant || ''}&deck=${cfg.deck || ''}&length=${cfg.length || ''}`, {}, m => {
+    if (m.type === 'waiting') { found = m.found || 1; want = m.want || 2; upd(); }
+    if (m.type === 'matched') joinRoom(m.room, Object.assign({ game, auto: m.humans || 2, fill: m.fill || 2 }, cfg));
     else if (m.type === 'error') { leave(); showPanel({ kind: 'error', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] }); }
   }, e => {
     if (gen !== NETGEN || e.code === 1000) return;

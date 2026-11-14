@@ -84,6 +84,11 @@ async function gatherRoom(env, makeRoom, chatId, from, game) {
 export async function handleCallback(q, env, makeRoom) {
   const chat = q.message && q.message.chat;
   if (!chat) return tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
+  if (q.data === 'notify:off' || q.data === 'notify:on') {
+    const on = q.data === 'notify:on';
+    await statsCall(env, '/notify', { id: 'tg:' + q.from.id, on });
+    return tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text: on ? '🔔 Нагадування увімкнено' : '🔕 Нагадування вимкнено. Увімкнути: /notify' });
+  }
   if (q.data === 'top') {
     await tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
     const rows = await statsCall(env, '/top?period=week');
@@ -108,6 +113,13 @@ async function handleCommand(msg, env, makeRoom) {
     return reply(topText(rows, '🏆 <b>Топ гравців тижня</b>'));
   }
   const priv = chat.type === 'private';
+  if (priv && (cmd === '/stop' || cmd === '/notify')) {
+    const on = cmd === '/notify';
+    await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, on, pm: true });
+    return reply(on ? '🔔 Нагадування увімкнено: бонус дня, турнір тижня. Вимкнути — /stop' : '🔕 Нагадування вимкнено. Увімкнути знову — /notify');
+  }
+  // someone who writes to the bot privately can get reminders
+  if (priv && msg.from) await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, pm: true, name: msg.from.first_name }).catch(() => {});
   if (['/start', '/play', '/help', '/igry', '/games', '/menu'].includes(cmd)) {
     // web_app buttons work only in private chats
     return reply(MENU_TEXT, { reply_markup: menuKeyboard(priv) });

@@ -26,8 +26,8 @@ new_sqlite_classes = ["Room", "Lobby"]
 tag = "v2"
 new_sqlite_classes = ["Stats"]
 
-# weekly top-10 in the news channel: Sunday 17:00 UTC (19:00 Kyiv in winter)
+# Sunday 17:00 UTC (19:00 Kyiv in winter): weekly tournament results; daily 14:00 and 15:30 UTC: reminders
 [triggers]
-crons = ["0 17 * * SUN"]
+crons = ["0 17 * * SUN", "0 14 * * *", "30 15 * * *"]
 
 # secrets (npx wrangler secret put …): BOT_TOKEN_2 = @IgryUA_bot token, WEBHOOK_SECRET = Telegram webhook secret

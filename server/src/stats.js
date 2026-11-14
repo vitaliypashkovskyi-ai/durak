@@ -1,11 +1,12 @@
 // Stats: one Durable Object (SQLite) with players' points, results for the weekly top,
 // and a cached lookup of the news channel and the players' chat linked to it.
-import { tg, CHANNEL, topText, esc } from './telegram.js';
+import { tg, CHANNEL, topText, esc, APP_URL } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w', checkers: 'checkers_w', nardy: 'nardy_w', dice: 'dice_w' };
 const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
-  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3', 'checkers_w', 'nardy_w', 'dice_w'];
+  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3', 'checkers_w', 'nardy_w', 'dice_w',
+  'last_seen', 'pm_ok', 'mute', 'reminded_day'];
 const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
@@ -61,8 +62,8 @@ export function achievements(p) {
 export const badges = p => achievements(p).filter(a => a.done).map(a => `${a.icon} ${a.name}`);
 
 // Today's date in Kyiv as a day number (the daily bonus resets at midnight Kyiv time)
-function kyivDay() {
-  const s = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
+function kyivDay(ts = Date.now()) {
+  const s = new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' });
   return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000);
 }
 const dailyBonus = streak => Math.min(streak, 7);
@@ -81,6 +82,7 @@ export class Stats {
     this.sql.exec('CREATE TABLE IF NOT EXISTS results(id TEXT, game TEXT, res TEXT, pts INTEGER, ts INTEGER)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS results_ts ON results(ts)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)');
+    this.seen = new Map();   // who has the app open now (in memory): id -> last ping
   }
 
   async fetch(req) {
@@ -89,11 +91,14 @@ export class Stats {
     if (url.pathname === '/report') { this.report(body); return json({ ok: true }); }
     if (url.pathname === '/profile') return json(this.profile(body.id));
     if (url.pathname === '/daily') return json(this.daily(body.id, body.name));
-    if (url.pathname === '/hello') return json(this.hello(body.id, body.name, body.ref));
+    if (url.pathname === '/hello') return json(this.hello(body.id, body.name, body.ref, body.pm));
     if (url.pathname === '/top') return json(this.top(url.searchParams.get('period')));
     if (url.pathname === '/community') return json(await this.community());
     if (url.pathname === '/weekly') return json(await this.weekly());
     if (url.pathname === '/tour') return json(this.tour(url.searchParams.get('id')));
+    if (url.pathname === '/ping') return json(this.ping(body.id));
+    if (url.pathname === '/notify') return json(this.notify(body));
+    if (url.pathname === '/remind') return json(await this.remind());
     return new Response('not found', { status: 404 });
   }
 
@@ -131,9 +136,11 @@ export class Stats {
 
   // First visit: +10 once. A brand-new player who came by a friend's link gets +5 more and the
   // friend +15 for every new player, without a daily cap.
-  hello(id, name, ref) {
+  hello(id, name, ref, pm) {
     if (!/^tg:\d+$/.test(String(id))) return { ok: false };
     const existed = this.sql.exec('SELECT welcome_done FROM players WHERE id = ?', id).toArray()[0];
+    this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
+    this.sql.exec('UPDATE players SET last_seen = ?, pm_ok = MAX(pm_ok, ?) WHERE id = ?', Date.now(), pm ? 1 : 0, id);
     if (existed && existed.welcome_done) return { ok: true, welcome: false };
     this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
     let bonus = WELCOME, inviter = null;
@@ -166,6 +173,62 @@ export class Stats {
     this.sql.exec('UPDATE players SET points = points + ?, streak = ?, best_streak = MAX(best_streak, ?), last_day = ? WHERE id = ?',
       bonus, streak, streak, today, id);
     return { ok: true, claimed: true, bonus, streak, next: dailyBonus(streak + 1), points: p.points + bonus };
+  }
+
+  // ---------- online counter ----------
+  ping(id) {
+    const now = Date.now();
+    if (id) this.seen.set(String(id), now);
+    for (const [k, t] of this.seen) if (now - t > 150000) this.seen.delete(k);
+    return { online: this.seen.size };
+  }
+
+  // ---------- reminders ----------
+  // {id, on?, pm?, name?}: on = reminders on/off, pm = the bot may write to this person
+  notify({ id, on, pm, name }) {
+    if (!/^tg:\d+$/.test(String(id))) return { ok: false };
+    this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO NOTHING', id, String(name || 'Гравець').slice(0, 24));
+    if (on !== undefined) this.sql.exec('UPDATE players SET mute = ? WHERE id = ?', on ? 0 : 1, id);
+    if (pm) this.sql.exec('UPDATE players SET pm_ok = 1 WHERE id = ?', id);
+    const p = this.sql.exec('SELECT mute, pm_ok FROM players WHERE id = ?', id).one();
+    return { ok: true, on: !p.mute, pm: !!p.pm_ok };
+  }
+  // Cron, twice a day: at most one message a day per person, only to those who were here this week but not today.
+  async remind() {
+    // REMIND_DAY_SHIFT only in server/.dev.vars: pretend it is a later day to test locally
+    const now = Date.now(), today = kyivDay() + Number(this.env.REMIND_DAY_SHIFT || 0);
+    const dow = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'Europe/Kyiv' })).getDay();   // 0 = Sunday
+    const rows = this.sql.exec(`SELECT id, name, points, streak, last_day, last_seen, reminded_day FROM players
+      WHERE pm_ok = 1 AND mute = 0 AND last_seen > ? AND reminded_day < ?`, now - WEEK, today).toArray();
+    const tour = (dow === 6 || dow === 0) ? this.tourRows(1000) : [];
+    const third = tour[2] ? tour[2].points : 0;
+    let sent = 0;
+    for (const p of rows) {
+      if (sent >= 40) break;                                   // Workers' outbound request limit per run
+      if (kyivDay(p.last_seen) >= today) continue;             // already played today
+      const place = tour.findIndex(r => r.id === p.id) + 1;
+      const streak = p.last_day === today - 1 ? p.streak : 0;
+      const next = Math.min(7, (p.last_day === today - 1 ? p.streak : 0) + 1);
+      let text = null;
+      if (place >= 4 && place <= 10 && third - tour[place - 1].points <= 9) {
+        text = `🏆 Ви на <b>${place}-му місці</b> в турнірі тижня — до призового місця лише <b>${third - tour[place - 1].points + 1}</b> оч.! Підсумки в неділю о 19:00 — встигніть зіграти 🎲`;
+      } else if (p.last_day < today && streak >= 2) {
+        text = `🔥 Ваша серія бонусів — <b>${streak} дн.</b> Не дайте їй згоріти: заберіть сьогоднішній бонус <b>+${next}</b> очок!`;
+      } else if (p.last_day < today && now - p.last_seen < 3 * 86400 * 1000) {
+        text = `🎁 Бонус дня чекає: <b>+${next}</b> очок. Зазирніть і заберіть — а заодно зіграйте партію 🃏`;
+      }
+      if (!text) continue;
+      const r = await tg(this.env, 'sendMessage', {
+        chat_id: p.id.slice(3), parse_mode: 'HTML', text,
+        reply_markup: { inline_keyboard: [[{ text: '🎮 Грати', web_app: { url: APP_URL } }], [{ text: '🔕 Не нагадувати', callback_data: 'notify:off' }]] },
+      }).catch(() => ({ ok: false }));
+      sent++;
+      if (r.ok) this.sql.exec('UPDATE players SET reminded_day = ? WHERE id = ?', today, p.id);
+      else if (r.error_code === 403) this.sql.exec('UPDATE players SET pm_ok = 0 WHERE id = ?', p.id);   // blocked the bot
+      else this.sql.exec('UPDATE players SET reminded_day = ? WHERE id = ?', today, p.id);
+    }
+    console.log('reminders', JSON.stringify({ candidates: rows.length, sent }));
+    return { candidates: rows.length, sent };
   }
 
   top(period) {

@@ -22,7 +22,10 @@ export { Stats } from './stats.js';
 const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice };
 const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2 };
 const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6 };   // durak, rpoker: depend on the deck
-const NO_RANDOM = new Set(['mafia', 'thousand', 'spy', 'goat', 'rpoker', 'svara', 'dice']);
+// Random opponent: how many players a table wants. If fewer people are found in MATCH_WAIT_MS,
+// whoever is waiting (2+) starts and bots take the free seats.
+const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6 };
+const MATCH_WAIT_MS = 25000;
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
 const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
@@ -52,6 +55,21 @@ export default {
       return new Response('ok');
     }
     if (url.pathname === '/api/top') return json(await statsCall(env, '/top?period=' + (url.searchParams.get('period') === 'week' ? 'week' : 'all')));
+    if (url.pathname === '/api/ping' && req.method === 'POST') {
+      // «🟢 N онлайн»: everyone with the app open pings once a minute
+      const body = await req.json().catch(() => ({}));
+      let id = null;
+      if (body.init) { const u = await authenticate({ init: body.init }, env); if (u) id = u.id; }
+      if (!id && body.gid) id = 'g:' + String(body.gid).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
+      if (!id || id.length < 6) return json({ online: 0 });
+      return json(await statsCall(env, '/ping', { id }));
+    }
+    if (url.pathname === '/api/notify' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
+      return json(await statsCall(env, '/notify', { id: user.id, on: !!body.on, pm: body.on ? true : undefined }));
+    }
     if (url.pathname === '/api/tour' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = body.init ? await authenticate({ init: body.init }, env) : null;
@@ -67,7 +85,7 @@ export default {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);
       if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
-      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref });
+      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref, pm: user.pm });
       if (r.inviter) {
         // tell the friend who invited (works if they have ever opened a chat with the bot)
         ctx.waitUntil(tg(env, 'sendMessage', {
@@ -87,9 +105,12 @@ export default {
     if (url.pathname === '/ws/match') {
       const game = url.searchParams.get('game') || 'durak';
       const variant = game === 'durak' ? durak.variantOf({ variant: url.searchParams.get('variant') }) : '';
-      if (!ENGINES[game] || NO_RANDOM.has(game)) return new Response('bad game', { status: 400 });
-      const deck = game === 'durak' ? durak.deckOf({ deck: url.searchParams.get('deck') }) : '';
-      return env.LOBBY.get(env.LOBBY.idFromName(`${game}:${variant}:${deck}`)).fetch(req);
+      if (!ENGINES[game] || !TARGET[game]) return new Response('bad game', { status: 400 });
+      const deck = game === 'durak' ? durak.deckOf({ deck: url.searchParams.get('deck') })
+        : game === 'rpoker' ? rpoker.deckOf({ deck: Number(url.searchParams.get('deck')) }) : '';
+      const length = game === 'rpoker' ? (url.searchParams.get('length') === 'short' ? 'short' : 'full')
+        : game === 'svara' ? svara.lengthOf({ length: url.searchParams.get('length') }) : '';
+      return env.LOBBY.get(env.LOBBY.idFromName(`${game}:${variant}:${deck}:${length}`)).fetch(new Request(req.url + '&target=' + TARGET[game], req));
     }
     if (url.pathname === '/ws/room') {
       const code = (url.searchParams.get('room') || '').toUpperCase();
@@ -100,7 +121,8 @@ export default {
   },
   // weekly top in the news channel (cron in wrangler.toml)
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(statsCall(env, '/weekly', {}));
+    if (event.cron === '0 17 * * SUN') ctx.waitUntil(statsCall(env, '/weekly', {}));
+    else ctx.waitUntil(statsCall(env, '/remind', {}));
   },
 };
 
@@ -125,7 +147,7 @@ async function verifyTelegram(init, token) {
   let u;
   try { u = JSON.parse(p.get('user')); } catch { return null; }
   if (!u || !u.id) return null;
-  return { id: 'tg:' + u.id, name: clean(u.first_name || u.username) };
+  return { id: 'tg:' + u.id, name: clean(u.first_name || u.username), pm: !!u.allows_write_to_pm };
 }
 const clean = s => String(s || '').replace(/[<>&"]/g, '').trim().slice(0, 24) || 'Гравець';
 async function authenticate(msg, env) {
@@ -171,23 +193,35 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b => ALPHABET[b % ALPHABET.length]).join('');
 
 export class Lobby {
-  constructor(state, env) { this.env = env; this.waiting = null; }
-  async fetch() {
+  constructor(state, env) { this.env = env; this.queue = []; this.timer = null; this.target = 2; }
+  async fetch(req) {
+    this.target = Math.max(2, Math.min(12, Number(new URL(req.url).searchParams.get('target')) || 2));
     return acceptWithHello(this.env, (ws, user) => {
-      const w = this.waiting;
-      if (w && w.user.id !== user.id && send(w.ws, { type: 'ping' })) {
-        this.waiting = null;
-        const room = genCode();
-        for (const s of [w.ws, ws]) { send(s, { type: 'matched', room }); try { s.close(1000, 'matched'); } catch {} }
-        return;
-      }
-      if (w) { try { w.ws.close(1000, 'replaced'); } catch {} }
-      this.waiting = { ws, user };
-      send(ws, { type: 'waiting' });
-      const drop = () => { if (this.waiting && this.waiting.ws === ws) this.waiting = null; };
+      this.queue = this.queue.filter(w => w.user.id !== user.id || (w.ws.close(1000, 'replaced'), false));
+      this.queue.push({ ws, user, at: Date.now() });
+      const drop = () => { this.queue = this.queue.filter(w => w.ws !== ws); this.tell(); };
       ws.addEventListener('close', drop);
       ws.addEventListener('error', drop);
+      this.check();
     });
+  }
+  alive() { this.queue = this.queue.filter(w => send(w.ws, { type: 'ping' })); }
+  tell() { this.queue.forEach(w => send(w.ws, { type: 'waiting', found: this.queue.length, want: this.target })); }
+  check() {
+    this.alive();
+    clearTimeout(this.timer);
+    if (this.queue.length >= this.target) return this.match(this.queue.splice(0, this.target));
+    if (this.queue.length >= 2) {
+      const wait = this.queue[0].at + MATCH_WAIT_MS - Date.now();
+      if (wait <= 0) return this.match(this.queue.splice(0, this.queue.length));
+      this.timer = setTimeout(() => this.check(), wait);
+    }
+    this.tell();
+  }
+  match(group) {
+    const room = genCode();
+    for (const w of group) { send(w.ws, { type: 'matched', room, humans: group.length, fill: this.target }); try { w.ws.close(1000, 'matched'); } catch {} }
+    this.tell();
   }
 }
 
@@ -206,7 +240,10 @@ function roomConfig(c) {
     cfg.max = rpoker.DECKS[cfg.deck].max;
   }
   if (c.game === 'svara') cfg.length = svara.lengthOf(c);
-  if (c.auto === 2) cfg.auto = 2;
+  if (Number.isInteger(c.auto) && c.auto >= 2 && c.auto <= cfg.max) {
+    cfg.auto = c.auto;
+    cfg.fill = Math.max(cfg.min, Math.min(cfg.max, Number(c.fill) || c.auto));
+  }
   return cfg;
 }
 
@@ -278,8 +315,24 @@ export class Room {
     const gone = () => this.onClose(s, ws);
     ws.addEventListener('close', gone);
     ws.addEventListener('error', gone);
-    if (!this.G && this.cfg.auto && this.humans().length >= this.cfg.auto) return this.start();
+    if (!this.G && this.cfg.auto) {
+      if (this.humans().length >= this.cfg.auto) return this.autoStart();
+      // someone from the queue may never arrive: start with whoever came
+      if (!this.autoTimer) this.autoTimer = setTimeout(() => { if (!this.G && this.humans().length) this.autoStart(); }, 15000);
+    }
     this.broadcast();
+  }
+
+  // a table from the random queue: bots take the free seats, then go
+  autoStart() {
+    clearTimeout(this.autoTimer);
+    const used = new Set(this.seats.map(x => x.name));
+    while (this.seats.length < Math.max(this.cfg.fill || 0, this.cfg.min) && this.seats.length < this.cfg.max && !NO_BOTS.has(this.cfg.game)) {
+      const name = BOT_NAMES.find(n => !used.has(n)) || 'Бот';
+      used.add(name);
+      this.seats.push({ id: 'bot:' + genCode(), name, ws: null, bot: true, botOnly: true });
+    }
+    if (this.seats.length >= this.cfg.min) this.start(); else this.broadcast();
   }
 
   onClose(s, ws) {

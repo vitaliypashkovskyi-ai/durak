@@ -54,7 +54,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 35;
+  var PAGE_VERSION = 36;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -264,6 +264,9 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
 .tourbox .tme{font-weight:700;color:#9a6a00}
 .tourbox .sub{color:#666;font-size:13px}
 
+.chip.notify{display:block;width:100%;margin:6px 0 2px;font-size:14px}
+#online{font-weight:600;color:#9be37f}
+
 /* checkers */
 .ckhead{text-align:center;color:#fff;font-size:14px;padding:4px 10px;border-radius:10px;opacity:.85;margin:2px auto}
 .ckhead.on{background:rgba(245,197,66,.28);opacity:1;font-weight:700}
@@ -435,33 +438,33 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=35",
-  "./js/host.js": "./js/host.js?v=35",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=35",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=35",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=35",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=35",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=35",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=35",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=35",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=35",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=35",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=35",
-  "./js/spy-data.js": "./js/spy-data.js?v=35",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=35",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=35",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=35",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=35",
-  "./js/svara-engine.js": "./js/svara-engine.js?v=35",
-  "./js/svara-ui.js": "./js/svara-ui.js?v=35",
-  "./js/checkers-engine.js": "./js/checkers-engine.js?v=35",
-  "./js/checkers-ui.js": "./js/checkers-ui.js?v=35",
-  "./js/nardy-engine.js": "./js/nardy-engine.js?v=35",
-  "./js/nardy-ui.js": "./js/nardy-ui.js?v=35",
-  "./js/dice-engine.js": "./js/dice-engine.js?v=35",
-  "./js/dice-ui.js": "./js/dice-ui.js?v=35"
+  "./js/common.js": "./js/common.js?v=36",
+  "./js/host.js": "./js/host.js?v=36",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=36",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=36",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=36",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=36",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=36",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=36",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=36",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=36",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=36",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=36",
+  "./js/spy-data.js": "./js/spy-data.js?v=36",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=36",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=36",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=36",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=36",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=36",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=36",
+  "./js/checkers-engine.js": "./js/checkers-engine.js?v=36",
+  "./js/checkers-ui.js": "./js/checkers-ui.js?v=36",
+  "./js/nardy-engine.js": "./js/nardy-engine.js?v=36",
+  "./js/nardy-ui.js": "./js/nardy-ui.js?v=36",
+  "./js/dice-engine.js": "./js/dice-engine.js?v=36",
+  "./js/dice-ui.js": "./js/dice-ui.js?v=36"
 } }
 </script>
-<script type="module" src="js/app.js?v=35"></script>
+<script type="module" src="js/app.js?v=36"></script>
 </body>
 </html>

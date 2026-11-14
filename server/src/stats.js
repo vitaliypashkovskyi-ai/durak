@@ -6,7 +6,7 @@ const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w', checkers: 'checkers_w', nardy: 'nardy_w', dice: 'dice_w' };
 const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
   'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3', 'checkers_w', 'nardy_w', 'dice_w',
-  'last_seen', 'pm_ok', 'mute', 'reminded_day', 'first_seen', 'vip_until'];
+  'last_seen', 'pm_ok', 'mute', 'reminded_day', 'first_seen', 'vip_until', 'champ'];
 const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
@@ -35,6 +35,20 @@ function questHit(q, e) {
 }
 // Weekly tournament: from Sunday 17:00 UTC (the cron) to the next one. Top-3 get bonus points and a cup.
 export const PRIZES = [30, 20, 10];
+// Monthly seasons: a separate table for each calendar month (Kyiv); the 1st of the month pays the top-3
+// and the winner wears 🏆 next to the name for the whole next month.
+export const SEASON_PRIZES = [50, 30, 20];
+const MONTHS_OF = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
+const MONTHS = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'];
+const monthKey = (ts = Date.now()) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' }).slice(0, 7);   // '2026-11'
+// Kyiv midnight of the 1st of the month that contains ts
+function monthStart(ts = Date.now()) {
+  const d = Number(new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' }).slice(8, 10));
+  const [h, m, s] = new Date(ts).toLocaleTimeString('en-GB', { timeZone: 'Europe/Kyiv', hour12: false }).split(':').map(Number);
+  return ts - ((d - 1) * 86400 + (h % 24) * 3600 + m * 60 + s) * 1000;
+}
+export const seasonName = key => MONTHS[Number(key.slice(5, 7)) - 1] + ' ' + key.slice(0, 4);
+export const seasonOf = key => MONTHS_OF[Number(key.slice(5, 7)) - 1];
 const TOUR_HOUR = 17;   // UTC, same as the cron in wrangler.toml
 function lastSunday(now = Date.now()) {
   const d = new Date(now);
@@ -71,6 +85,7 @@ const ACHIEVEMENTS = [
   ['🕵️', 'Розвідник', '3 перемоги шпигуном', p => p.spyrole_w, 3],
   ['🔍', 'Ловець шпигунів', '5 перемог агентом у Шпигуні', p => p.spy_w - p.spyrole_w, 5],
   ['🤝', 'Душа компанії', 'Запросіть 5 друзів', p => p.refs, 5],
+  ['👑', 'Чемпіон сезону', 'Виграйте місячний сезон', p => p.champ, 1],
   ['🏆', 'Чемпіон тижня', 'Виграйте турнір тижня', p => p.cup1, 1],
   ['🏅', 'Призер', '3 рази потрапте в трійку турніру', p => (p.cup1 || 0) + (p.cup2 || 0) + (p.cup3 || 0), 3],
   ['🌈', 'Майстер на всі руки', 'Виграйте в кожну гру хоча б раз',
@@ -132,10 +147,11 @@ export class Stats {
     if (url.pathname === '/friends') return json(this.friends(body.id));
     if (url.pathname === '/invite') return json(this.canInvite(body.from, body.to));
     if (url.pathname === '/quests') return json(this.quests(body.id));
+    if (url.pathname === '/season') return json(this.season(url.searchParams.get('id')));
     if (url.pathname === '/admin') return json(this.admin());
     if (url.pathname === '/buy') return json(this.buy(body));
     if (url.pathname === '/notify') return json(this.notify(body));
-    if (url.pathname === '/remind') return json(await this.remind());
+    if (url.pathname === '/remind') { await this.seasonClose(); return json(await this.remind()); }
     return new Response('not found', { status: 404 });
   }
 
@@ -174,7 +190,8 @@ export class Stats {
     const daily = { available: p.last_day !== today, streak, next: dailyBonus(p.last_day === today || p.last_day === today - 1 ? p.streak + 1 : 1) };
     const owned = this.sql.exec("SELECT DISTINCT item FROM purchases WHERE id = ? AND item != 'vip'", String(id)).toArray().map(r => r.item);
     const vip = (p.vip_until || 0) > Date.now();
-    return { ...p, rank, week, level: level(p.points), badges: badges(p), achievements: achievements(p), daily, owned, vip, vip_until: p.vip_until || 0 };
+    const ch = this.kvGet('champion'), champion = !!ch && ch.id === String(id) && ch.until > Date.now();
+    return { ...p, rank, week, level: level(p.points), badges: badges(p), achievements: achievements(p), daily, owned, vip, vip_until: p.vip_until || 0, champion };
   }
 
   // First visit: +10 once. A brand-new player who came by a friend's link gets +5 more and the
@@ -250,6 +267,59 @@ export class Stats {
         all: one('SELECT COALESCE(SUM(stars), 0) AS n FROM purchases'), buyers: one('SELECT COUNT(DISTINCT id) AS n FROM purchases'),
         vips: one('SELECT COUNT(*) AS n FROM players WHERE vip_until > ?', now) },
     };
+  }
+
+  // ---------- monthly seasons ----------
+  seasonNow() {
+    let s = this.kvGet('season');
+    if (!s) { s = { key: monthKey(), start: monthStart() }; this.kvSet('season', s); }
+    return s;
+  }
+  seasonRows(s, end, limit) {
+    return this.sql.exec(`SELECT r.id AS id, p.name AS name, SUM(r.pts) AS points, SUM(r.res = 'win') AS wins, MIN(r.ts) AS first
+      FROM results r JOIN players p ON p.id = r.id WHERE r.ts >= ? AND r.ts < ? GROUP BY r.id HAVING points > 0
+      ORDER BY points DESC, wins DESC, first ASC LIMIT ?`, s.start, end, limit).toArray();
+  }
+  season(id) {
+    const s = this.seasonNow(), now = Date.now();
+    const rows = this.seasonRows(s, now + 1, 1000);
+    const i = id ? rows.findIndex(r => r.id === String(id)) : -1;
+    const next = monthStart(monthStart(now) + 40 * 86400 * 1000);
+    return {
+      key: s.key, name: seasonName(s.key), end: next, now, prizes: SEASON_PRIZES,
+      top: rows.slice(0, 10).map(({ name, points, wins }) => ({ name, points, wins })),
+      me: i >= 0 ? { place: i + 1, points: rows[i].points } : null,
+      last: this.kvGet('season_last'),
+    };
+  }
+  // Cron (daily): when the month has changed, close the previous season once.
+  async seasonClose() {
+    // SEASON_KEY_TEST only in server/.dev.vars: pretend the month has changed to test locally
+    const s = this.seasonNow(), key = this.env.SEASON_KEY_TEST || monthKey();
+    if (s.key === key) return { closed: false };
+    const end = this.env.SEASON_KEY_TEST ? Date.now() : monthStart();
+    const rows = this.seasonRows(s, end, 10);
+    const winners = rows.slice(0, SEASON_PRIZES.length).map((r, i) => ({ ...r, place: i + 1, prize: SEASON_PRIZES[i] }));
+    for (const w of winners) this.sql.exec('UPDATE players SET points = points + ? WHERE id = ?', w.prize, w.id);
+    if (winners[0]) {
+      this.sql.exec('UPDATE players SET champ = champ + 1 WHERE id = ?', winners[0].id);
+      this.kvSet('champion', { id: winners[0].id, name: winners[0].name, key: s.key, until: monthStart(end + 40 * 86400 * 1000) });
+    }
+    this.kvSet('season_last', { key: s.key, name: seasonName(s.key), of: seasonOf(s.key), winners: winners.map(({ name, points, place, prize }) => ({ name, points, place, prize })) });
+    this.kvSet('season', { key, start: end });
+    const medal = ['🥇', '🥈', '🥉'];
+    for (const w of winners) {
+      await tg(this.env, 'sendMessage', { chat_id: w.id.slice(3), parse_mode: 'HTML',
+        text: `${medal[w.place - 1]} Сезон «${seasonName(s.key)}» завершено: ви на <b>${w.place} місці</b> (${w.points} оч.) — <b>+${w.prize}</b> очок!` +
+          (w.place === 1 ? `\n🏆 Ви — <b>Чемпіон ${seasonOf(s.key)}</b>: увесь наступний місяць біля вашого імені буде 🏆.` : '') }).catch(() => {});
+    }
+    const { channelId } = await this.community();
+    if (channelId && rows.length) {
+      await tg(this.env, 'sendMessage', { chat_id: channelId, parse_mode: 'HTML', disable_web_page_preview: true,
+        text: topText(rows, `🗓 <b>Підсумки сезону «${seasonName(s.key)}»</b>`) +
+          `\n\n🏆 Чемпіон ${seasonOf(s.key)} — <b>${esc(winners[0].name)}</b>!\n🎁 ${winners.map(w => `${medal[w.place - 1]} +${w.prize}`).join('  ')}\n\nНовий сезон «${seasonName(key)}» уже почався — усі стартують з нуля 🎲` }).catch(() => {});
+    }
+    return { closed: true };
   }
 
   // ---------- friends ----------

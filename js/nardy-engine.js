@@ -4,6 +4,7 @@
 // (якщо можна лише один кубик — більший). Не можна будувати «паркан» із 6 пунктів поспіль, якщо попереду нього
 // немає жодної шашки суперника. Коли всі 15 у «домі» (останні 6 пунктів) — викидаєте. Хто перший викинув усі — виграв;
 // якщо суперник не викинув жодної — «марс» (подвійна перемога). Pure JS (page + server).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const delay = { bot: 750, advance: 0 };
 const N = 15;
@@ -18,7 +19,7 @@ export const posOf = (seat, a) => (a - 12 * seat + 24) % 24;
 
 export function create(cfg, players) {
   const G = {
-    game: 'nardy', num: 1,
+    game: 'nardy', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     pos: [Array(N).fill(0), Array(N).fill(0)],      // each checker's path position
     turn: rnd(2), first: [true, true], dice: [], left: [], headUsed: 0, headLimit: 1,
@@ -202,15 +203,23 @@ function evaluate(S, seat) {
   }
   return s;
 }
+// hard bot: points held directly in front of the opponent's leading checkers are worth more
+function blockAhead(S, seat) {
+  const opp = 1 - seat, own = new Set(S.pos[seat].filter(p => p < 24 && p > 0).map(p => posOf(opp, absOf(seat, p))));
+  let s = 0;
+  for (const q of S.pos[opp]) if (q < 24) for (let k = 1; k <= 6; k++) if (own.has(q + k)) s += 1 / k;
+  return s;
+}
 export function botAction(G, seat) {
   if (G.over || G.waitUntil || G.turn !== seat) return null;
   const legal = steps(G);
   if (!legal.length) return null;
+  if (slip(G, 0.45)) { const st = pickAny(legal); return { t: 'move', from: st.from, die: st.die }; }
   const { seqs } = sequences(G, seat);
   let best = -Infinity, pick = null;
   for (const q of seqs) {
     if (!legal.some(st => st.from === q.path[0].from && st.die === q.path[0].die)) continue;
-    const v = evaluate(q.state, seat) + Math.random() * 0.2;
+    const v = evaluate(q.state, seat) + (G.level === 'hard' ? 0.5 * blockAhead(q.state, seat) : 0) + Math.random() * (G.level === 'hard' ? 0.05 : 0.2);
     if (v > best) { best = v; pick = q.path[0]; }
   }
   pick = pick || legal[0];

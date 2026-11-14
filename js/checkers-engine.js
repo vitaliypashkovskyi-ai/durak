@@ -4,6 +4,7 @@
 // Дійшла до останнього ряду — дамка (якщо під час удару — далі б'є вже як дамка). Дамка ходить і б'є
 // на будь-яку відстань. Хто не може зробити хід (або без шашок) — програв.
 // Нічия: 30 ходів поспіль лише дамками без взяття, або 300 ходів усього. Pure JS (page + server).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const delay = { bot: 700, advance: 0 };
 const DIRS = [-9, -7, 7, 9];
@@ -27,7 +28,7 @@ export function create(cfg, players) {
     if (r < 3) B[sq] = 3; else if (r > 4) B[sq] = 1;
   }
   return {
-    game: 'checkers', num: 1,
+    game: 'checkers', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     B, turn: 0, chain: null, taken: [], quiet: 0, plies: 0,
     last: null, over: false, winner: null, ev: null,
@@ -171,10 +172,11 @@ export function botAction(G, seat) {
   const ms = moves(S);
   if (!ms.length) return null;
   const pieces = G.B.filter(v => v).length;
-  const depth = pieces > 16 ? 4 : pieces > 8 ? 5 : 6;
+  const base = pieces > 16 ? 4 : pieces > 8 ? 5 : 6;
+  const depth = G.level === 'easy' ? 1 : G.level === 'hard' ? base : base - 1;
   let best = -Infinity, pick = [];
   for (const m of ms) {
-    const v = search(m.state, depth - 1, -Infinity, Infinity, seat) + Math.random() * 0.3;
+    const v = search(m.state, depth - 1, -Infinity, Infinity, seat) + Math.random() * (G.level === 'easy' ? 12 : 0.3);
     if (v > best) { best = v; pick = [m]; }
   }
   const st = pick[0].first;

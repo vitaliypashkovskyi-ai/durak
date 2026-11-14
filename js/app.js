@@ -23,6 +23,7 @@ import * as nardyUI from './nardy-ui.js';
 import * as diceE from './dice-engine.js';
 import * as diceUI from './dice-ui.js';
 import { SHOP } from './shop.js';
+import { LEVELS, HARD_GAMES, NO_LEVEL, levelOf } from './level.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -425,16 +426,21 @@ function showSetup(game) {
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
   if (ns.length > 1 && !g.noBots) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   if (g.noBots) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Гра для живих людей: ${g.minP}–${g.maxP} гравців. Створіть кімнату й запросіть друзів.`; body.appendChild(l); }
+  if (!NO_LEVEL.includes(game) && !g.noBots) {
+    const lv = Object.entries(LEVELS).filter(([k]) => k !== 'hard' || HARD_GAMES.includes(game)).map(([k, t]) => [k, (k === 'easy' ? '🙂 ' : k === 'hard' ? '🔥 ' : '') + t]);
+    chips('Боти', lv, levelOf(cfg), v => { cfg.level = v; });
+  }
   const s = stat(game);
-  const c = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) }
+  const c0 = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) }
     : game === 'rpoker' ? { deck: rpokerE.deckOf(cfg), length: cfg.length === 'short' ? 'short' : 'full' }
     : game === 'svara' ? { length: svaraE.lengthOf(cfg) } : {});
+  const c = () => Object.assign(c0(), NO_LEVEL.includes(game) ? {} : { level: levelOf(cfg) });
   showPanel({
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
       ...(g.noBots ? [] : [{ text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) }]),
       { text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) },
-      ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c()) }]),
+      ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c0()) }]),
       { text: '📖 Правила', sec: true, fn: () => showRules(game, () => showSetup(game)) },
       { text: 'Назад', sec: true, fn: hidePanel },
     ],
@@ -479,7 +485,7 @@ function runLocal(game, cfg, n, G) {
     },
   });
   S = { kind: 'local', game, cfg, n, host, act: m => host.act(0, m) };
-  levels.list = null; levels.vip = null;
+  levels.list = null; levels.vip = null; levels.champ = null;
   api.online = null;
   openGame(game);
   host.changed();
@@ -592,11 +598,14 @@ async function claimDaily() {
 // ---------- rating ----------
 async function showRating(period) {
   showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
-  let top = [], me = null, tour = null;
+  let top = [], me = null, tour = null, season = null;
   try {
     if (period === 'week') {
       tour = await (await fetch(`${httpBase()}/api/tour`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) })).json();
       top = tour.top;
+    } else if (period === 'season') {
+      season = await (await fetch(`${httpBase()}/api/season`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) })).json();
+      top = season.top;
     } else top = await (await fetch(`${httpBase()}/api/top?period=${period}`)).json();
     if (signedIn) {
       const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) });
@@ -637,17 +646,18 @@ async function showRating(period) {
     add('p', 'muted', 'Свої очки побачите, коли відкриєте гру в Telegram (@IgryUA_bot).');
   }
   const tabs = document.createElement('div'); tabs.className = 'chips';
-  for (const [p, t] of [['week', '🏆 Турнір тижня'], ['all', 'За весь час']]) {
+  for (const [p, t] of [['week', '🏆 Тиждень'], ['season', '🗓 Сезон'], ['all', 'За весь час']]) {
     const b = document.createElement('button'); b.className = 'chip' + (p === period ? ' on' : ''); b.textContent = t;
     b.onclick = () => showRating(p); tabs.appendChild(b);
   }
   body.appendChild(tabs);
   if (tour) body.appendChild(tourBox(tour));
+  if (season) body.appendChild(seasonBox(season));
   const ol = document.createElement('ol'); ol.className = 'plist top';
   if (!top.length) { const li = document.createElement('li'); li.className = 'free'; li.textContent = 'Поки порожньо — зіграйте онлайн з друзями!'; ol.appendChild(li); }
   top.forEach((r, i) => {
     const li = document.createElement('li');
-    li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name} — ${r.points} оч.` + (tour && tour.prizes[i] ? ` · приз +${tour.prizes[i]}` : '');
+    li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name} — ${r.points} оч.` + ((tour || season) && (tour || season).prizes[i] ? ` · приз +${(tour || season).prizes[i]}` : '');
     ol.appendChild(li);
   });
   body.appendChild(ol);
@@ -692,6 +702,19 @@ async function pingOnline() {
 setTimeout(pingOnline, 1500);
 setInterval(pingOnline, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pingOnline(); });
+
+// Monthly season: name, days left, prizes, my place, last season's champion.
+function seasonBox(t) {
+  const box = document.createElement('div'); box.className = 'tourbox';
+  const line = (text, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); };
+  const days = Math.max(0, Math.ceil((t.end - t.now) / 86400000));
+  line(`🗓 Сезон «${t.name}» · до кінця ${days} дн`, 'tl1');
+  line(`🎁 Призи: 🥇 +${t.prizes[0]} · 🥈 +${t.prizes[1]} · 🥉 +${t.prizes[2]} очок, переможцю — 🏆 біля імені на весь наступний місяць`);
+  if (t.me) line(`Ваше місце: ${t.me.place} · ${t.me.points} оч.`, 'tme');
+  else if (signedIn) line('Кожен сезон усі стартують з нуля — грайте онлайн з людьми!', 'sub');
+  if (t.last && t.last.winners && t.last.winners.length) line(`🏆 Чемпіон ${t.last.of}: ${t.last.winners[0].name}`, 'sub');
+  return box;
+}
 
 // Weekly tournament: time left, prizes, my place, last week's winners.
 function tourBox(t) {
@@ -774,6 +797,7 @@ function onRoomMsg(m) {
   api.online = m.online;
   levels.list = m.levels || null;
   levels.vip = m.vips || null;
+  levels.champ = m.champs || null;
   onView(m);
 }
 
@@ -787,7 +811,7 @@ function showLobby(m) {
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {
     const li = document.createElement('li');
-    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${LVL_MARK[s.lvl] ? ' ' + LVL_MARK[s.lvl] : ''}${s.vip ? ' 💎' : ''}${i === me ? ' (ви)' : ''}${i === m.host ? ' (ведучий)' : ''}${s.online ? '' : ' 📴'}`;
+    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${LVL_MARK[s.lvl] ? ' ' + LVL_MARK[s.lvl] : ''}${s.champ ? ' 🏆' : ''}${s.vip ? ' 💎' : ''}${i === me ? ' (ви)' : ''}${i === m.host ? ' (ведучий)' : ''}${s.online ? '' : ' 📴'}`;
     ul.appendChild(li);
   });
   for (let i = m.seats.length; i < m.cfg.max; i++) {

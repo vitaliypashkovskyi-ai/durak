@@ -1,6 +1,7 @@
 // Дурень: підкидний / переводний; колода 36 (2–6 гравців), 52 (до 8) або дві по 36 (до 12); + бот.
 // Pure JS with no DOM: the page uses it for games with bots, the server for online games.
 // Rule helpers accept either the full state G or a player's view V (see cnt/isDone/hasPassed).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
 export const SUITS = ['♠', '♣', '♥', '♦'];
@@ -71,7 +72,7 @@ export function create(cfg, players) {
   shuffle(deck);
   const n = players.length;
   const G = {
-    game: 'durak', variant: variantOf(cfg),
+    game: 'durak', level: levelOf(cfg), variant: variantOf(cfg),
     deckSize: size, total: deck.length,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     deck, trump: deck[0].s, trumpCard: deck[0], hands: players.map(() => []), table: [],
@@ -195,7 +196,7 @@ export function botAction(G, seat) {
   if (!G.table.length) {
     if (seat !== G.attacker || !hand.length) return null;
     // endgame: sometimes lead a random card, otherwise bots can pass the same cards around forever
-    const c = !G.deck.length && rnd(10) < 4 ? hand[rnd(hand.length)] : [...hand].sort(by)[0];
+    const c = (!G.deck.length && rnd(10) < 4) || slip(G) ? hand[rnd(hand.length)] : [...hand].sort(by)[0];
     return { t: 'play', id: c.id };
   }
   if (seat === G.defender) {
@@ -203,13 +204,14 @@ export function botAction(G, seat) {
     const transfers = hand.filter(c => canTransfer(G, seat, c)).sort(by);
     if (transfers.length && transfers[0].s !== G.trump) return { t: 'transfer', id: transfers[0].id };
     const plan = planDefense(G, seat);
+    if (plan && slip(G, 0.2)) return { t: 'take' };   // an easy bot sometimes takes cards it could beat
     const costly = plan && G.deck.length > 8 &&
       plan.some(m => m.c.s === G.trump && G.table[m.i].a.s !== G.trump && m.c.r >= R('К'));
     if (!plan || costly) return transfers.length ? { t: 'transfer', id: transfers[0].id } : { t: 'take' };
     return { t: 'cover', i: plan[0].i, id: plan[0].c.id };
   }
   if (G.passed[seat] || (!G.taking && undefended(G))) return null;   // let the defender answer first
-  const add = hand.filter(c => canAdd(G, seat, c))
+  const add = slip(G, 0.5) ? null : hand.filter(c => canAdd(G, seat, c))
     .filter(c => !G.deck.length || (c.s !== G.trump && c.r <= R('Д'))).sort(by)[0];
   if (add) return { t: 'play', id: add.id };
   return canPass(G, seat) ? { t: 'pass' } : null;

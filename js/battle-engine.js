@@ -1,5 +1,6 @@
 // Морський бій на 2–4 гравці + бот. Pure JS (page + server).
 // Board: 10×10, cell index = y*10 + x. Shots: 0 unknown, 1 miss, 2 hit, 3 sunk.
+import { levelOf, slip, pickAny } from './level.js';
 
 export const SIZE = 10;
 export const FLEET = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
@@ -44,7 +45,7 @@ const shipsLeft = f => f.ships.filter(s => !sunk(s)).length;
 
 export function create(cfg, players) {
   const G = {
-    game: 'battle', num: 1,
+    game: 'battle', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     fleets: players.map(() => randomFleet()),
     shots: players.map(() => new Array(SIZE * SIZE).fill(0)),
@@ -164,5 +165,12 @@ export function botAction(G, seat) {
   if (G.over) return null;
   if (G.phase === 'place') return G.ready[seat] ? null : { t: 'ready' };
   if (G.turn !== seat || !G.alive[seat]) return null;
-  return botShot(G, seat);
+  const a = botShot(G, seat);
+  // an easy bot often forgets to finish off a hit ship and shoots anywhere
+  if (a && slip(G, 0.5)) {
+    const sh = G.shots[a.target], free = [];
+    for (let c = 0; c < sh.length; c++) if (!sh[c]) free.push(c);
+    if (free.length) a.cell = pickAny(free);
+  }
+  return a;
 }

@@ -104,6 +104,11 @@ export default {
       if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
       return json(await statsCall(env, '/notify', { id: user.id, on: !!body.on, pm: body.on ? true : undefined }));
     }
+    if (url.pathname === '/api/season' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = body.init ? await authenticate({ init: body.init }, env) : null;
+      return json(await statsCall(env, '/season' + (user && user.id.startsWith('tg:') ? '?id=' + encodeURIComponent(user.id) : '')));
+    }
     if (url.pathname === '/api/tour' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = body.init ? await authenticate({ init: body.init }, env) : null;
@@ -289,6 +294,7 @@ function roomConfig(c) {
     cfg.max = rpoker.DECKS[cfg.deck].max;
   }
   if (c.game === 'svara') cfg.length = svara.lengthOf(c);
+  if (c.level === 'easy' || c.level === 'hard') cfg.level = c.level;   // bots in this room
   if (Number.isInteger(c.auto) && c.auto >= 2 && c.auto <= cfg.max) {
     cfg.auto = c.auto;
     cfg.fill = Math.max(cfg.min, Math.min(cfg.max, Number(c.fill) || c.auto));
@@ -353,7 +359,7 @@ export class Room {
     if (s.lvl == null && s.id.startsWith('tg:')) {
       // the player's level (for the ⭐🏅👑 mark others see); looked up once per seat
       s.lvl = 0;
-      statsCall(this.env, '/profile', { id: s.id }).then(p => { s.lvl = (p.level && p.level.idx) || 0; s.vip = !!p.vip; if (s.lvl >= 3 || s.vip) this.broadcast(); }).catch(() => {});
+      statsCall(this.env, '/profile', { id: s.id }).then(p => { s.lvl = (p.level && p.level.idx) || 0; s.vip = !!p.vip; s.champ = !!p.champion; if (s.lvl >= 3 || s.vip || s.champ) this.broadcast(); }).catch(() => {});
     }
     clearTimeout(this.timers.get(s.id));
     if (s.bot && this.G) {           // came back: take the seat back from the bot
@@ -488,7 +494,7 @@ export class Room {
       return {
         type: 'lobby', game: cfg.game, cfg, you: i,
         host: this.seats.findIndex(x => x.id === this.hostId),
-        seats: this.seats.map(x => ({ name: x.name, bot: x.botOnly, online: x.botOnly || !!x.ws, lvl: x.lvl || 0, vip: !!x.vip })),
+        seats: this.seats.map(x => ({ name: x.name, bot: x.botOnly, online: x.botOnly || !!x.ws, lvl: x.lvl || 0, vip: !!x.vip, champ: !!x.champ })),
       };
     }
     const v = ENGINES[cfg.game].view(this.G, i);
@@ -498,6 +504,7 @@ export class Room {
     v.again = this.seats.map(x => this.again.has(x.id));
     v.levels = this.seats.map(x => x.lvl || 0);
     v.vips = this.seats.map(x => !!x.vip);
+    v.champs = this.seats.map(x => !!x.champ);
     return v;
   }
   broadcast() { this.seats.forEach((s, i) => { if (s.ws) send(s.ws, this.view(i)); }); }

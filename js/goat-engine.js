@@ -3,6 +3,7 @@
 // Очки карт: туз 11, 10 — 10, король 4, дама 3, валет 2 (разом 120). За роздачу: 61+ очок → +2,
 // суперники < 31 → +4, суперники без жодної взятки → +6; 60:60 — «яйця», наступна роздача подвоюється.
 // Гра до 12; хто програв — «козли». Pure JS (page + server).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const LABELS = ['6', '7', '8', '9', 'В', 'Д', 'К', '10', 'Т'];   // index = r
 export const SUITS = ['♠', '♣', '♥', '♦'];
@@ -49,7 +50,7 @@ export function legal(S, seat, c) {
 
 export function create(cfg, players) {
   const G = {
-    game: 'goat', num: 1,
+    game: 'goat', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     score: [0, 0], dealer: rnd(4), deal: 0, eggs: 0,
     over: false, winner: null, ev: null, waitUntil: null,
@@ -141,6 +142,7 @@ export function botAction(G, seat) {
   const hand = G.hands[seat];
   const L = hand.filter(c => legal(G, seat, c));
   if (!L.length) return null;
+  if (slip(G, 0.7)) return { t: 'play', id: pickAny(L).id };
   const cheap = (a, b) => (points(a) + (isTrump(a) ? 20 : 0) + strength(a) / 1000) - (points(b) + (isTrump(b) ? 20 : 0) + strength(b) / 1000);
   if (!G.trick.length) {
     const ace = L.find(c => !isTrump(c) && c.r === 8);

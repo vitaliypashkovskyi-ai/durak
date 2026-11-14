@@ -3,6 +3,7 @@
 // (можна й нуль). Верх: одиниці…шістки (сума цих граней), за 63+ у верху — бонус 35. Низ: трійка й каре
 // (сума всіх кубиків), фул-хаус 25, мала стріт 30, велика стріт 40, покер (5 однакових) 50, шанс (сума).
 // Після 13 раундів перемагає найбільша сума. Pure JS (page + server).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const CATS = [
   ['n1', 'Одиниці'], ['n2', 'Двійки'], ['n3', 'Трійки'], ['n4', 'Четвірки'], ['n5', "П'ятірки"], ['n6', 'Шістки'],
@@ -48,7 +49,7 @@ export function totals(sheet) {
 
 export function create(cfg, players) {
   const G = {
-    game: 'dice', num: 1,
+    game: 'dice', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     sheets: players.map(() => ({})),
     turn: rnd(players.length), round: 1,
@@ -132,11 +133,15 @@ export function botAction(G, seat) {
   if (!G.rolls) return { t: 'roll' };
   const sheet = G.sheets[seat];
   const now = bestCell(sheet, G.dice);
+  if (slip(G, 0.25)) {
+    const free = CATS.map(c => c[0]).filter(k => sheet[k] == null);
+    return G.rolls < 3 && Math.random() < 0.5 ? { t: 'roll', hold: G.dice.map((_, i) => i !== 0 && Math.random() < 0.5) } : { t: 'score', cat: pickAny(free) };
+  }
   if (G.rolls >= 3) return { t: 'score', cat: now.cat };
   let bestHold = null, bestExp = now.g;
   for (let mask = 0; mask < 31; mask++) {        // 31 = keep everything = stop
     const hold = [0, 1, 2, 3, 4].map(i => !!(mask & (1 << i)));
-    let s = 0; const T = 36;
+    let s = 0; const T = G.level === 'hard' ? 90 : G.level === 'easy' ? 10 : 36;
     for (let t = 0; t < T; t++) {
       const d = G.dice.map((x, i) => (hold[i] ? x : 1 + Math.floor(Math.random() * 6)));
       s += bestCell(sheet, d).g;

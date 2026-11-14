@@ -3,6 +3,7 @@
 // прикуп → по карті суперникам → замовлення. Марьяжі ♠40 ♣60 ♦80 ♥100 (оголошуються автоматично,
 // коли ходите королем/дамою з пари й уже маєте взятку). Болт (0 очок) ×3 = −120. Бочка з 880:
 // виграти можна лише взявши гру, 3 невдалі роздачі на бочці = −120. Гра до 1000.
+import { levelOf, slip, pickAny } from './level.js';
 
 // strength order: 9 < В < Д < К < 10 < Т
 export const LABELS = ['9', 'В', 'Д', 'К', '10', 'Т'];
@@ -64,7 +65,7 @@ export function canMarry(S, seat, c) {
 // ---------- game ----------
 export function create(cfg, players) {
   const G = {
-    game: 'thousand', num: 1,
+    game: 'thousand', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     scores: [0, 0, 0], bolts: [0, 0, 0], barrel: [0, 0, 0],
     dealer: rnd(3), deal: 0, over: false, winner: null, ev: null, waitUntil: null,
@@ -248,7 +249,7 @@ export function botAction(G, seat) {
   if (G.over || G.waitUntil || G.turn !== seat) return null;
   const hand = G.hands[seat];
   if (G.phase === 'bid') {
-    const next = G.bid + 5, est = estimate(hand, 30);
+    const next = G.bid + 5, est = estimate(hand, slip(G, 0.5) ? 50 : 30);   // an easy bot overbids now and then
     return next <= est && canBid(G, seat, next) && G.holder !== seat ? { t: 'bid', v: next } : { t: 'pass' };
   }
   if (G.phase === 'talon') {
@@ -265,6 +266,7 @@ export function botAction(G, seat) {
   if (G.phase === 'play') {
     const L = hand.filter(c => legal(G, seat, c));
     if (!L.length) return null;
+    if (slip(G)) return { t: 'play', id: pickAny(L).id };
     const val = c => POINTS[c.r] + (c.s === G.trump ? 15 : 0);
     if (!G.trick.length) {
       const marry = L.filter(c => c.r === Q && canMarry(G, seat, c)).sort((a, b) => MARRIAGE[b.s] - MARRIAGE[a.s])[0];

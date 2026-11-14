@@ -6,6 +6,7 @@
 // першим — «забираю» або «по старших [масть]», не першим — «забираю» або «скидаю».
 // Очки: точно — 10 за взятку (0 із 0 — 5), зайві — +1 за кожну, недобір — −10 за кожну;
 // золота ×2; мізер: −10 за взятку, жодної — +50. Pure JS (page + server).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const LABELS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];
 export const SUITS = ['♠', '♣', '♥', '♦'];
@@ -83,7 +84,7 @@ export function trickWinner(trick, trump) {
 export function create(cfg, players) {
   const n = players.length, size = deckOf(cfg);
   const G = {
-    game: 'rpoker', num: 1, size, full: fullGame(cfg),
+    game: 'rpoker', level: levelOf(cfg), num: 1, size, full: fullGame(cfg),
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     rounds: buildRounds(n, size, fullGame(cfg)), round: -1,
     scores: players.map(() => 0), dealer: rnd(n),
@@ -217,6 +218,7 @@ export function botAction(G, seat) {
   if (G.phase === 'bid') {
     // strong cards in hand, pulled towards the average share of tricks (k / n)
     let v = G.type === 'dark' ? Math.round(G.k / n) : Math.min(G.k, Math.round(0.6 * estimate(hand, G.trump) + 0.4 * G.k / n));
+    if (slip(G, 0.6)) v = Math.floor(Math.random() * (G.k + 1));   // an easy bot guesses its bid
     if (!canBid(G, seat, v)) v = v > 0 ? v - 1 : v + 1;
     if (!canBid(G, seat, v)) v = [...Array(G.k + 1).keys()].find(x => canBid(G, seat, x));
     return { t: 'bid', v };
@@ -224,6 +226,7 @@ export function botAction(G, seat) {
   if (G.phase !== 'play') return null;
   const L = hand.filter(c => legal(G, seat, c));
   if (!L.length) return null;
+  if (slip(G, 0.7)) { const c = pickAny(L); return { t: 'play', id: c.id, mode: c.joker ? (G.trick.length ? 'take' : 'take') : undefined }; }
   const need = G.type === 'mizer' ? -1 : (G.bids[seat] ?? 0) - G.taken[seat];
   const val = c => (c.joker ? 100 : c.r + (G.trump != null && c.s === G.trump ? 20 : 0));
   const asc = [...L].sort((a, b) => val(a) - val(b));

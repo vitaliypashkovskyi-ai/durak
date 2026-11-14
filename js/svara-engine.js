@@ -5,6 +5,7 @@
 // На відкритті найбільше очок забирає банк; нічия — «свара»: ті, хто зрівнявся, переграють за той самий банк.
 // У кожного на старті 50 фішок; без фішок — вибуває. Гра до останнього з фішками або до ліміту роздач
 // (коротка 10, повна 20) — тоді перемагає найбагатший. Pure JS (page + server).
+import { levelOf, slip, pickAny } from './level.js';
 
 export const LABELS = ['6', '7', '8', '9', '10', 'В', 'Д', 'К', 'Т'];   // index = r
 export const SUITS = ['♠', '♣', '♥', '♦'];
@@ -44,7 +45,7 @@ export function score(cards) {
 
 export function create(cfg, players) {
   const G = {
-    game: 'svara', num: 1,
+    game: 'svara', level: levelOf(cfg), num: 1,
     players: players.map(p => ({ name: p.name, bot: !!p.bot })),
     chips: players.map(() => START),
     hands: players.map(() => []),
@@ -173,6 +174,11 @@ export function botAction(G, seat) {
   if (G.over || G.waitUntil || G.phase !== 'bet' || G.turn !== seat) return null;
   const s = score(G.hands[seat]);
   const need = toCall(G, seat);
+  if (slip(G, 0.6)) {        // an easy bot: pays to see weak hands, folds good ones, raises on a whim
+    const raiseBy = RAISES.filter(v => G.cur + v <= G.cap);
+    if (raiseBy.length && rnd(3) === 0) return { t: 'raise', v: raiseBy[Math.min(raiseBy.length - 1, rnd(3))] };
+    return need && s >= 24 && rnd(2) === 0 ? { t: 'fold' } : { t: 'call' };
+  }
   const others = active(G).length - 1;
   const r = rnd(100);
   // strength 0..1 (≈ 15 weak, 21 average, 25+ strong, 30+ very strong)

@@ -15,6 +15,8 @@ import * as svara from '../../js/svara-engine.js';
 import * as checkers from '../../js/checkers-engine.js';
 import * as nardy from '../../js/nardy-engine.js';
 import * as dice from '../../js/dice-engine.js';
+import * as spider from '../../js/spider-engine.js';
+import * as mines from '../../js/mines-engine.js';
 import * as bgammon from '../../js/bgammon-engine.js';
 import * as pref from '../../js/pref-engine.js';
 import * as quiz from '../../js/quiz-engine.js';
@@ -24,9 +26,9 @@ import { Host } from '../../js/host.js';
 import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES, invoiceLink, CHANNEL } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice, chess, klondike, quiz, pref, bgammon };
-const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2, chess: 2, klondike: 1, quiz: 2, pref: 3, bgammon: 2 };
-const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6, chess: 2, klondike: 1, quiz: 8, pref: 3, bgammon: 2 };   // durak, rpoker: depend on the deck
+const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice, chess, klondike, quiz, pref, bgammon, mines, spider };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2, chess: 2, klondike: 1, quiz: 2, pref: 3, bgammon: 2, mines: 1, spider: 1 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6, chess: 2, klondike: 1, quiz: 8, pref: 3, bgammon: 2, mines: 1, spider: 1 };   // durak, rpoker: depend on the deck
 // Random opponent: how many players a table wants. If fewer people are found in MATCH_WAIT_MS,
 // whoever is waiting (2+) starts and bots take the free seats.
 const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6, chess: 2, quiz: 4, pref: 3, bgammon: 2 };
@@ -62,6 +64,12 @@ export default {
       return new Response('ok');
     }
     if (url.pathname === '/api/top') return json(await statsCall(env, '/top?period=' + (url.searchParams.get('period') === 'week' ? 'week' : 'all')));
+    if (url.pathname === '/api/club' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ ok: false, why: 'login' }, 401);
+      return json(await statsCall(env, '/club', { id: user.id, op: String(body.op || 'get'), name: body.name, code: body.code }));
+    }
     if (['/api/friends', '/api/quests', '/api/invite'].includes(url.pathname) && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);

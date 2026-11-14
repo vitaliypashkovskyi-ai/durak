@@ -1,6 +1,7 @@
 // Stats: one Durable Object (SQLite) with players' points, results for the weekly top,
 // and a cached lookup of the news channel and the players' chat linked to it.
 import { tg, CHANNEL, topText, esc, APP_URL, GAMES } from './telegram.js';
+import { pickWord, names, leaks, ROUND_MS, IDLE_MS } from './croc.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w', checkers: 'checkers_w', nardy: 'nardy_w', dice: 'dice_w', chess: 'chess_w', quiz: 'quiz_w', pref: 'pref_w', bgammon: 'bgammon_w' };
@@ -136,6 +137,8 @@ export class Stats {
     // where a player came from (link label) and which days they opened the game
     if (!cols.includes('source')) this.sql.exec("ALTER TABLE players ADD COLUMN source TEXT DEFAULT ''");
     this.sql.exec('CREATE TABLE IF NOT EXISTS visits(id TEXT, day INTEGER, PRIMARY KEY(id, day))');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS clubs(code TEXT PRIMARY KEY, name TEXT, owner TEXT, created INTEGER)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS club_members(id TEXT PRIMARY KEY, club TEXT, joined INTEGER)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS friends(a TEXT, b TEXT, ts INTEGER, games INTEGER DEFAULT 0, PRIMARY KEY(a, b))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS quests(id TEXT, day INTEGER, qi INTEGER, prog INTEGER DEFAULT 0, done INTEGER DEFAULT 0, PRIMARY KEY(id, day, qi))');
     this.invited = new Map();   // 'a>b' -> last invite time (anti-spam)
@@ -166,6 +169,8 @@ export class Stats {
     if (url.pathname === '/evening') return json(this.evening(body.id));
     if (url.pathname === '/hourly') return json(await this.hourly());
     if (url.pathname === '/dash') return json(this.dash());
+    if (url.pathname === '/croc') { await this.croc(body); return json({ ok: true }); }
+    if (url.pathname === '/club') return json(this.club(body));
     if (url.pathname === '/season') return json(this.season(url.searchParams.get('id')));
     if (url.pathname === '/admin') return json(this.admin());
     if (url.pathname === '/buy') return json(this.buy(body));
@@ -345,6 +350,122 @@ export class Stats {
           `\n\n🏆 Чемпіон ${seasonOf(s.key)} — <b>${esc(winners[0].name)}</b>!\n🎁 ${winners.map(w => `${medal[w.place - 1]} +${w.prize}`).join('  ')}\n\nНовий сезон «${seasonName(key)}» уже почався — усі стартують з нуля 🎲` }).catch(() => {});
     }
     return { closed: true };
+  }
+
+  // ---------- clubs: a group of players with a shared weekly score ----------
+  clubWeek() {
+    // weekly points of every club = the members' points in the current weekly tournament
+    return this.sql.exec(`SELECT c.code AS code, c.name AS name, COUNT(DISTINCT m.id) AS members, COALESCE(SUM(r.pts), 0) AS points
+      FROM clubs c JOIN club_members m ON m.club = c.code LEFT JOIN results r ON r.id = m.id AND r.ts > ?
+      GROUP BY c.code ORDER BY points DESC, members DESC`, this.tourStart()).toArray();
+  }
+  club({ id, op, name, code }) {
+    if (!/^tg:\d+$/.test(String(id))) return { ok: false, why: 'login' };
+    const mine = () => this.sql.exec('SELECT club FROM club_members WHERE id = ?', id).toArray()[0];
+    const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let err = null;
+    if (op === 'create') {
+      const nm = String(name || '').replace(/[<>&"]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+      if (nm.length < 3) err = 'Назва — від 3 символів';
+      else if (mine()) err = 'Ви вже в клубі — спершу вийдіть';
+      else if (this.sql.exec('SELECT name FROM clubs').toArray().some(r => r.name.toLowerCase() === nm.toLowerCase())) err = 'Клуб з такою назвою вже є';   // SQLite lower() is ASCII only
+      else {
+        let c; do { c = Array.from({ length: 5 }, () => ALPH[Math.floor(Math.random() * ALPH.length)]).join(''); } while (this.sql.exec('SELECT COUNT(*) AS n FROM clubs WHERE code = ?', c).one().n);
+        this.sql.exec('INSERT INTO clubs(code, name, owner, created) VALUES(?, ?, ?, ?)', c, nm, id, Date.now());
+        this.sql.exec('INSERT INTO club_members(id, club, joined) VALUES(?, ?, ?)', id, c, Date.now());
+      }
+    } else if (op === 'join') {
+      const c = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const club = this.sql.exec('SELECT code FROM clubs WHERE code = ?', c).toArray()[0];
+      const m = mine();
+      if (!club) err = 'Клуб не знайдено — перевірте код';
+      else if (m && m.club === c) err = null;
+      else if (m) err = 'Ви вже в іншому клубі — спершу вийдіть';
+      else if (this.sql.exec('SELECT COUNT(*) AS n FROM club_members WHERE club = ?', c).one().n >= 30) err = 'У клубі вже 30 гравців';
+      else this.sql.exec('INSERT INTO club_members(id, club, joined) VALUES(?, ?, ?)', id, c, Date.now());
+    } else if (op === 'leave') {
+      const m = mine();
+      if (m) {
+        this.sql.exec('DELETE FROM club_members WHERE id = ?', id);
+        const left = this.sql.exec('SELECT id FROM club_members WHERE club = ? ORDER BY joined LIMIT 1', m.club).toArray()[0];
+        if (!left) this.sql.exec('DELETE FROM clubs WHERE code = ?', m.club);                                  // empty club disappears
+        else this.sql.exec('UPDATE clubs SET owner = ? WHERE code = ? AND owner = ?', left.id, m.club, id);   // the next member leads
+      }
+    }
+    const week = this.clubWeek();
+    const top = week.slice(0, 10).map(({ name, members, points }) => ({ name, members, points }));
+    const m = mine();
+    if (!m) return { ok: !err, err, club: null, top };
+    const c = this.sql.exec('SELECT code, name, owner FROM clubs WHERE code = ?', m.club).one();
+    const members = this.sql.exec(`SELECT m.id AS id, COALESCE(p.name, 'Гравець') AS name, COALESCE((SELECT SUM(pts) FROM results r WHERE r.id = m.id AND r.ts > ?), 0) AS week
+      FROM club_members m LEFT JOIN players p ON p.id = m.id WHERE m.club = ? ORDER BY week DESC`, this.tourStart(), m.club).toArray()
+      .map(x => ({ pub: this.pubOf(x.id), name: x.name, week: x.week, owner: x.id === c.owner, me: x.id === id }));
+    const place = week.findIndex(x => x.code === c.code) + 1;
+    return { ok: !err, err, club: { code: c.code, name: c.name, members, place, points: (week[place - 1] || {}).points || 0, clubs: week.length }, top };
+  }
+
+  // ---------- Крокодил in group chats ----------
+  async croc({ kind, chat, from, text, cbId, data }) {
+    const key = 'croc:' + chat, now = Date.now();
+    let g = this.kvGet(key);
+    if (g && now - g.last > IDLE_MS) { this.sql.exec('DELETE FROM kv WHERE k = ?', key); g = null; }
+    const name = esc((from && from.name) || 'Гравець');
+    const kb = { inline_keyboard: [[{ text: '👀 Показати слово', callback_data: 'croc:show' }], [{ text: '🔄 Інше слово', callback_data: 'croc:skip' }, { text: '⏹ Завершити', callback_data: 'croc:stop' }]] };
+    const say = (t, withKb) => tg(this.env, 'sendMessage', { chat_id: chat, parse_mode: 'HTML', text: t, ...(withKb ? { reply_markup: kb } : {}) }).catch(() => {});
+    const alert = t => tg(this.env, 'answerCallbackQuery', { callback_query_id: cbId, text: t, show_alert: true }).catch(() => {});
+    const save = () => { this.kvSet(key, g); if (this.env.ADMIN_TEST === '1' && g) console.log('croc word', g.word, 'host', g.host); };   // ADMIN_TEST: .dev.vars only
+    const award = (id, nm) => {
+      const pid = 'tg:' + id;
+      this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO NOTHING', pid, String(nm || 'Гравець').slice(0, 24));
+      this.sql.exec('UPDATE players SET points = points + 1 WHERE id = ?', pid);
+    };
+    if (kind === 'start') {
+      if (g) return say(`🐊 Гра вже йде — пояснює <b>${esc(g.hostName)}</b>. Пишіть здогадки в чат!`);
+      g = { word: pickWord(), host: from.id, hostName: from.name, start: now, last: now, scores: {} };
+      save();
+      return say(`🐊 <b>Крокодил!</b> Пояснює <b>${name}</b> — натисніть «👀 Показати слово».
+Пояснюйте словами, не називаючи слова й спільнокореневих. Інші — пишіть здогадки в чат!
+⏱ На слово — 3 хвилини.`, true);
+    }
+    if (!g) { if (kind === 'cb') return alert('Гра вже закінчилась. Почніть нову: /krokodyl'); return; }
+    g.last = now;
+    if (kind === 'cb') {
+      if (data === 'croc:show') return from.id === g.host ? alert(`🤫 Ваше слово: «${g.word}»`) : alert('Слово бачить лише той, хто пояснює 😉');
+      if (data === 'croc:skip') {
+        if (from.id !== g.host) return alert('Змінити слово може лише той, хто пояснює');
+        g.word = pickWord(g.word); g.start = now; save();
+        return alert(`🔄 Нове слово: «${g.word}»`);
+      }
+      if (data === 'croc:stop') {
+        if (from.id !== g.host) return alert('Завершити може той, хто пояснює');
+        this.sql.exec('DELETE FROM kv WHERE k = ?', key);
+        const top = Object.values(g.scores).sort((a, b) => b.n - a.n).slice(0, 5);
+        await alert('Гру завершено');
+        return say(`🐊 Крокодил завершено. Слово було «${g.word}».` + (top.length ? '\n🏆 ' + top.map(s => `${esc(s.name)} — ${s.n}`).join(' · ') : '') + '\nЩе раз: /krokodyl');
+      }
+      return;
+    }
+    // a message in the chat
+    if (now - g.start > ROUND_MS) {
+      const old = g.word; g.word = pickWord(old); g.start = now; save();
+      return say(`⏰ Час вийшов! Слово було «${old}». <b>${esc(g.hostName)}</b>, у вас нове слово 👇`, true);
+    }
+    if (from.id === g.host) {
+      if (leaks(text, g.word)) {
+        const old = g.word; g.word = pickWord(old); g.start = now; save();
+        return say(`🙊 ${name}, слово (чи його корінь) називати не можна! Це було «${old}». Нове слово 👇`, true);
+      }
+      return save();
+    }
+    if (names(text, g.word)) {
+      const old = g.word;
+      const s = g.scores[from.id] || { name: from.name, n: 0 }; s.n++; g.scores[from.id] = s;
+      award(from.id, from.name); award(g.host, g.hostName);
+      g.host = from.id; g.hostName = from.name; g.word = pickWord(old); g.start = now; save();
+      return say(`✅ <b>${name}</b> вгадав(ла): «${old}»! +1 очко вам і тому, хто пояснював.
+Тепер пояснює <b>${name}</b> 👇`, true);
+    }
+    save();
   }
 
   // ---------- the hourly cron: evening tournament, reminders, season ----------
@@ -644,8 +765,11 @@ export class Stats {
     for (const w of winners) {
       this.sql.exec(`UPDATE players SET points = points + ?, cup${w.place} = cup${w.place} + 1 WHERE id = ?`, w.prize, w.id);
     }
+    // the club of the week: every member +5
+    const bestClub = this.clubWeek().find(c => c.points > 0) || null;
+    if (bestClub) this.sql.exec('UPDATE players SET points = points + 5 WHERE id IN (SELECT id FROM club_members WHERE club = ?)', bestClub.code);
     this.kvSet('tour_start', now);
-    this.kvSet('tour_last', { end: now, winners: winners.map(({ name, points, place, prize }) => ({ name, points, place, prize })) });
+    this.kvSet('tour_last', { end: now, club: bestClub ? bestClub.name : null, winners: winners.map(({ name, points, place, prize }) => ({ name, points, place, prize })) });
     const medal = ['🥇', '🥈', '🥉'];
     for (const w of winners) {
       await tg(this.env, 'sendMessage', {
@@ -659,7 +783,7 @@ export class Stats {
     const prizes = winners.map(w => `${medal[w.place - 1]} ${esc(w.name)} +${w.prize}`).join('\n');
     const r = await tg(this.env, 'sendMessage', {
       chat_id: channelId, parse_mode: 'HTML', disable_web_page_preview: true,
-      text: topText(rows, '🏆 <b>Підсумки турніру тижня</b>') + `\n\n🎁 <b>Призи:</b>\n${prizes}\n\nНовий турнір уже почався — грайте онлайн з друзями в @IgryUA_bot і забирайте призи: 🥇 +${PRIZES[0]}, 🥈 +${PRIZES[1]}, 🥉 +${PRIZES[2]} 🎲`,
+      text: topText(rows, '🏆 <b>Підсумки турніру тижня</b>') + (bestClub ? `\n\n🏠 Клуб тижня — <b>${esc(bestClub.name)}</b> (${bestClub.points} оч.): кожному учаснику +5!` : '') + `\n\n🎁 <b>Призи:</b>\n${prizes}\n\nНовий турнір уже почався — грайте онлайн з друзями в @IgryUA_bot і забирайте призи: 🥇 +${PRIZES[0]}, 🥈 +${PRIZES[1]}, 🥉 +${PRIZES[2]} 🎲`,
     });
     return { posted: !!r.ok };
   }

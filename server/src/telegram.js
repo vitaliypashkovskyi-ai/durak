@@ -18,6 +18,8 @@ export const GAMES = {
   checkers: { icon: '⚪', title: 'Шашки' },
   nardy: { icon: '🎲', title: 'Довгі нарди' },
   dice: { icon: '⚀', title: 'Кості' },
+  spider: { icon: '🕷', title: 'Павук' },
+  mines: { icon: '💣', title: 'Сапер' },
   bgammon: { icon: '🎲', title: 'Короткі нарди' },
   pref: { icon: '🎩', title: 'Преферанс' },
   quiz: { icon: '❓', title: 'Вікторина' },
@@ -66,6 +68,10 @@ async function inlineQuery(q, env) {
       `🎲 <b>${name}</b> кличе тебе зіграти: ${g.icon} <b>${esc(g.title)}</b>!
 Кімната ${words[1]} — натисни кнопку й сідай за стіл.`,
       `▶ Приєднатися`, joinUrl(words[1] + ref));
+  } else if (words[0] === 'k' && /^[A-Z0-9]{5}$/.test(words[1] || '')) {
+    card('club' + words[1], '🏠 Запросити в клуб', `Код клубу ${words[1]}`,
+      `🏠 <b>${name}</b> кличе тебе у свій клуб в «Ігри UA»! Граємо разом і змагаємося з іншими клубами 🏆`,
+      '🏠 Вступити в клуб', `https://t.me/${BOT}?startapp=club-${words[1]}`);
   } else if (words[0] === 'w' && GAMES[words[1]]) {
     const g = GAMES[words[1]];
     card('win' + words[1], `🏆 Похвалитися перемогою`, `${g.icon} ${g.title}`,
@@ -148,7 +154,14 @@ export async function handleUpdate(update, env, makeRoom) {
   if (update.inline_query) return inlineQuery(update.inline_query, env);
   const msg = update.message;
   if (msg && msg.successful_payment) return paid(msg, env);
-  if (!msg || typeof msg.text !== 'string' || !msg.text.startsWith('/')) return;
+  if (!msg || typeof msg.text !== 'string') return;
+  // a plain message in a group: maybe a guess in Крокодил
+  if (!msg.text.startsWith('/')) {
+    if (msg.chat && msg.chat.type !== 'private' && msg.from && !msg.from.is_bot) {
+      return statsCall(env, '/croc', { kind: 'msg', chat: msg.chat.id, from: { id: msg.from.id, name: msg.from.first_name }, text: msg.text });
+    }
+    return;
+  }
   return handleCommand(msg, env, makeRoom);
 }
 
@@ -181,6 +194,9 @@ async function gatherRoom(env, makeRoom, chatId, from, game) {
 export async function handleCallback(q, env, makeRoom) {
   const chat = q.message && q.message.chat;
   if (!chat) return tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
+  if (typeof q.data === 'string' && q.data.startsWith('croc:')) {
+    return statsCall(env, '/croc', { kind: 'cb', chat: chat.id, from: { id: q.from.id, name: q.from.first_name }, cbId: q.id, data: q.data });
+  }
   if (q.data === 'notify:off' || q.data === 'notify:on') {
     const on = q.data === 'notify:on';
     await statsCall(env, '/notify', { id: 'tg:' + q.from.id, on });
@@ -218,6 +234,10 @@ async function handleCommand(msg, env, makeRoom) {
     const text = adminText(await statsCall(env, '/admin', {}));
     if (env.ADMIN_TEST === '1') console.log(text);
     return reply(text, { reply_markup: { inline_keyboard: [[{ text: '📊 Відкрити панель з графіками', web_app: { url: APP_URL + 'admin/' } }]] } });
+  }
+  if (cmd === '/krokodyl' || cmd === '/croc' || cmd === '/krokodil') {
+    if (priv) return reply('🐊 Крокодил грають у групі: додайте @IgryUA_bot у свій чат (адміністратором) і напишіть /krokodyl — або грайте в нашому чаті @ua_Igry.');
+    return statsCall(env, '/croc', { kind: 'start', chat: chat.id, from: { id: msg.from.id, name: msg.from.first_name } });
   }
   if (priv && cmd === '/paysupport') {
     return reply('💳 <b>Покупки за ⭐ Stars</b>\nЗа зірки продаються лише оформлення (сорочки карт, столи) і VIP-значок — на гру вони не впливають.\nЯкщо з покупкою щось не так — напишіть сюди або в чат @ua_Igry з позначкою «оплата», ми розберемося.');

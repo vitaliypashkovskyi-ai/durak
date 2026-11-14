@@ -9,10 +9,15 @@ export const rules = `
 <p><b>Колода</b> (угорі ліворуч): торкніться, щоб відкрити 1 карту (або 3 — у складному режимі). Коли колода скінчиться, торкніться ще раз — скид повернеться в колоду.</p>
 <p>Як ходити: торкніться карти — вона сама піде, куди можна (спершу в дім). Щоб покласти в інше місце — торкніться карти, потім потрібного стовпчика. «💡» підкаже хід.</p>`;
 
-let api, V = null, sel = null, busy = false, autoT = null;
+let api, V = null, sel = null, busy = false, autoT = null, tick = null;
+const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+const bestKey = v => 'games.klondike.best.' + (v.draw3 ? 3 : 1);
+const best = v => { try { return Number(localStorage.getItem(bestKey(v))) || 0; } catch (e) { return 0; } };
+const elapsed = v => Math.max(0, Math.floor(((v.over && v.endedAt ? v.endedAt : Date.now()) - v.started) / 1000));
 
 export function mount(box, a) {
-  api = a; V = null; sel = null; busy = false; clearTimeout(autoT);
+  api = a; V = null; sel = null; busy = false; clearTimeout(autoT); clearInterval(tick);
+  tick = setInterval(() => { if (V && !V.over && $('klInfo')) drawInfo(); }, 1000);
   box.innerHTML = `
     <div class="klinfo" id="klInfo"></div>
     <div class="kltop" id="klTop"></div>
@@ -22,6 +27,7 @@ export function mount(box, a) {
 
 export function render(v) {
   V = v; busy = false;
+  if (v.won && !v.endedAt) { v.endedAt = Date.now(); const t = elapsed(v), b = best(v); if (!b || t < b) { try { localStorage.setItem(bestKey(v), String(t)); } catch (e) {} if (b) toast(`Новий рекорд: ${fmt(t)}! 🏆`); } }
   if (v.ev) { if (v.ev.kind === 'found') sfx('chime'); else if (v.ev.kind === 'draw' || v.ev.kind === 'move') sfx('card'); }
   draw();
   // all cards open and the stock empty: put everything home by itself
@@ -71,11 +77,15 @@ function dropOn(place) {
   return true;
 }
 
+function drawInfo() {
+  const v = V, b = best(v);
+  $('klInfo').textContent = `⏱ ${fmt(elapsed(v))} · ходів ${v.moves} · ${v.draw3 ? 'по 3' : 'по 1'} · у домах ${v.foundN.reduce((a, c) => a + c, 0)}/52` + (b ? ` · рекорд ${fmt(b)}` : '');
+}
 function draw() {
   if (!V) return;
   const v = V;
   const secs = Math.floor((Date.now() - v.started) / 1000);
-  $('klInfo').textContent = `Ходів: ${v.moves} · ${v.draw3 ? 'по 3 карти' : 'по 1 карті'} · у домах ${v.foundN.reduce((a, b) => a + b, 0)}/52`;
+  drawInfo();
   // top row: stock, waste, (gap), 4 foundations
   const t = $('klTop'); t.innerHTML = '';
   const stock = document.createElement('div'); stock.className = 'klslot';
@@ -132,6 +142,6 @@ export function result(v) {
   V = v;
   const mins = Number.isFinite(v.started) ? Math.max(1, Math.round((Date.now() - v.started) / 60000)) : null;
   return v.won
-    ? { res: 'win', icon: '🏆', title: 'Пасьянс зійшовся!', text: `${v.moves} ходів` + (mins ? ` · близько ${mins} хв` : '') }
+    ? { res: 'win', icon: '🏆', title: 'Пасьянс зійшовся!', text: `${v.moves} ходів` + (Number.isFinite(v.started) ? ` · ${fmt(elapsed(v))}` : '') + (best(v) ? ` · рекорд ${fmt(best(v))}` : '') }
     : { res: 'lose', icon: '🂠', title: 'Не зійшовся', text: `У домах ${v.foundN.reduce((a, b) => a + b, 0)} з 52 карт. Спробуйте ще!` };
 }

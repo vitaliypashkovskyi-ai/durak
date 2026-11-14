@@ -3,7 +3,7 @@
 // (checkers, nardy, dice) — elsewhere it plays like normal.
 export const LEVELS = { easy: 'Легкий', normal: 'Звичайний', hard: 'Сильний' };
 export const HARD_GAMES = ['checkers', 'nardy', 'dice', 'chess', 'quiz', 'bgammon'];
-export const NO_LEVEL = ['mafia', 'spy', 'klondike'];          // social games: bots talk and vote, no «strength»
+export const NO_LEVEL = ['mafia', 'spy', 'klondike', 'mines', 'spider'];          // social games: bots talk and vote, no «strength»
 export const levelOf = cfg => (cfg && (cfg.level === 'easy' || cfg.level === 'hard') ? cfg.level : 'normal');
 // an easy bot's slip: true with probability p (default 35 %)
 export const slip = (G, p = 0.35) => G && G.level === 'easy' && Math.random() < p;

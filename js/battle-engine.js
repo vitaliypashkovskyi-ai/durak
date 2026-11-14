@@ -40,6 +40,25 @@ export function randomFleet() {
   }
 }
 
+// a fleet placed by hand: ships = [[cell, …], …] — the right sizes, straight lines, not touching (even corners)
+export function checkFleet(ships) {
+  if (!Array.isArray(ships) || ships.length !== FLEET.length) return null;
+  const sizes = ships.map(s => (Array.isArray(s) ? s.length : 0)).sort((a, b) => b - a);
+  if (sizes.join() !== [...FLEET].sort((a, b) => b - a).join()) return null;
+  const own = new Array(SIZE * SIZE).fill(-1), out = [];
+  for (const cells of ships) {
+    if (!cells.every(c => Number.isInteger(c) && c >= 0 && c < SIZE * SIZE)) return null;
+    const cs = [...cells].sort((a, b) => a - b);
+    const hor = cs.every(c => ((c / SIZE) | 0) === ((cs[0] / SIZE) | 0)) && cs.every((c, k) => c === cs[0] + k);
+    const ver = cs.every((c, k) => c === cs[0] + k * SIZE);
+    if (!hor && !ver) return null;
+    for (const c of cs) if (own[c] !== -1 || around(c).some(a => own[a] !== -1)) return null;
+    cs.forEach(c => { own[c] = out.length; });
+    out.push({ cells: cs, hits: 0 });
+  }
+  return { own, ships: out };
+}
+
 const sunk = s => s.hits >= s.cells.length;
 const shipsLeft = f => f.ships.filter(s => !sunk(s)).length;
 
@@ -71,6 +90,7 @@ export function act(G, seat, m) {
   if (G.phase === 'place') {
     if (G.ready[seat]) return false;
     if (m.t === 'shuffle') { G.fleets[seat] = randomFleet(); return true; }
+    if (m.t === 'fleet') { const f = checkFleet(m.ships); if (!f) return false; G.fleets[seat] = f; return true; }
     if (m.t === 'ready') { G.ready[seat] = true; startIfReady(G); return true; }
     return false;
   }

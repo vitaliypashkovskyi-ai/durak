@@ -32,6 +32,10 @@ import * as prefE from './pref-engine.js';
 import * as prefUI from './pref-ui.js';
 import * as bgammonE from './bgammon-engine.js';
 import * as bgammonUI from './bgammon-ui.js';
+import * as minesE from './mines-engine.js';
+import * as minesUI from './mines-ui.js';
+import * as spiderE from './spider-engine.js';
+import * as spiderUI from './spider-ui.js';
 import { SHOP } from './shop.js';
 import { LEVELS, HARD_GAMES, NO_LEVEL, levelOf } from './level.js';
 import { Host } from './host.js';
@@ -83,6 +87,8 @@ GAMES.klondike = { title: 'Косинка', icon: '🂠', sub: 'пасьянс �
 GAMES.quiz = { title: 'Вікторина', icon: '❓', sub: '2–8 гравців', E: quizE, UI: quizUI, minP: 2, maxP: 8, defP: 4 };
 GAMES.pref = { title: 'Преферанс', icon: '🎩', sub: '3 гравці', E: prefE, UI: prefUI, minP: 3, maxP: 3 };
 GAMES.bgammon = { title: 'Короткі нарди', icon: '🎲', sub: '2 гравці, з боєм', E: bgammonE, UI: bgammonUI, minP: 2, maxP: 2 };
+GAMES.mines = { title: 'Сапер', icon: '💣', sub: 'гра для одного', E: minesE, UI: minesUI, minP: 1, maxP: 1, noRandom: true, solo: true };
+GAMES.spider = { title: 'Павук', icon: '🕷', sub: 'пасьянс для одного', E: spiderE, UI: spiderUI, minP: 1, maxP: 1, noRandom: true, solo: true };
 const SOON = [];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
@@ -113,6 +119,9 @@ function applyLook() {
   const table = LOOKS.table.find(x => x[0] === l.table) || LOOKS.table[0];
   document.body.dataset.back = back[0];
   document.body.dataset.table = table[0];
+  // comfort: big cards and text, a brighter or darker table
+  document.body.classList.toggle('big', !!l.big);
+  document.body.dataset.bright = l.bright === 'bright' || l.bright === 'dim' ? l.bright : '';
   if (tg) { try { tg.setHeaderColor(table[4]); tg.setBackgroundColor(table[4]); } catch (e) {} }
 }
 applyLook();
@@ -180,6 +189,20 @@ function drawLooks(lvl, points) {
     });
     body.append(l, grid);
   };
+  // comfort settings for everyone (no level needed)
+  const comfort = (title, key, opts) => {
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = title;
+    const box = document.createElement('div'); box.className = 'chips';
+    const curL = pref('look', {});
+    opts.forEach(([v, text]) => {
+      const b = document.createElement('button'); b.className = 'chip' + ((curL[key] || opts[0][0]) === v ? ' on' : ''); b.textContent = text;
+      b.onclick = () => { setPref('look', Object.assign({}, pref('look', {}), { [key]: v })); applyLook(); sfx('pop'); drawLooks(lvl, points); };
+      box.appendChild(b);
+    });
+    body.append(l, box);
+  };
+  comfort('🔠 Розмір карт і тексту', 'big', [[false, 'Звичайний'], [true, 'Великий']]);
+  comfort('☀️ Яскравість столу', 'bright', [['', 'Звичайна'], ['bright', 'Світліша'], ['dim', 'Темніша']]);
   section('Сорочка карт', 'back');
   section('Стіл', 'table');
   if (signedIn) {
@@ -289,8 +312,10 @@ function showHub() {
     const rowF = document.createElement('div');
     rowF.className = 'hubrow';
     const fb = document.createElement('button'); fb.className = 'hubact'; fb.textContent = '👫 Друзі'; fb.onclick = () => showFriends(null);
-    const qb = document.createElement('button'); qb.className = 'hubact'; qb.textContent = '📋 Завдання дня'; qb.onclick = showQuests;
-    rowF.append(fb, qb);
+    const qb = document.createElement('button'); qb.className = 'hubact'; qb.textContent = '📋 Завдання'; qb.onclick = showQuests;
+    const cb = document.createElement('button'); cb.className = 'hubact'; cb.textContent = '🏠 Клуб'; cb.onclick = () => showClub();
+    rowF.className = 'hubrow three';
+    rowF.append(fb, cb, qb);
     top.appendChild(rowF);
   }
   const open = url => { if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); };
@@ -442,7 +467,9 @@ function showSetup(game) {
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
   if (game === 'pref') chips('Тривалість', Object.entries(prefE.LENGTHS).map(([k, x]) => [k, `${x.label} · ${x.deals} роздач`]), prefE.lengthOf(cfg), v => { cfg.length = v; });
   if (game === 'quiz') chips('Тема', [['', '🎲 Усі теми'], ...Object.entries(quizE.CATS)], cfg.cat || '', v => { cfg.cat = v; });
-  if (g.solo) chips('Колода', [[1, 'По 1 карті (легше)'], [3, 'По 3 карти (складніше)']], cfg.draw === 3 ? 3 : 1, v => { cfg.draw = v; });
+  if (game === 'klondike') chips('Колода', [[1, 'По 1 карті (легше)'], [3, 'По 3 карти (складніше)']], cfg.draw === 3 ? 3 : 1, v => { cfg.draw = v; });
+  if (game === 'spider') chips('Масті', Object.entries(spiderE.MODES).map(([k, x]) => [Number(k), x]), spiderE.suitsOf(cfg), v => { cfg.suits = v; });
+  if (game === 'mines') chips('Розмір', Object.entries(minesE.SIZES).map(([k, x]) => [k, `${x.label} · ${x.w}×${x.h}, ${x.mines} мін`]), minesE.sizeOf(cfg), v => { cfg.size = v; });
   if (ns.length > 1 && !g.noBots) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   if (g.noBots) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Гра для живих людей: ${g.minP}–${g.maxP} гравців. Створіть кімнату й запросіть друзів.`; body.appendChild(l); }
   if (!NO_LEVEL.includes(game) && !g.noBots) {
@@ -458,7 +485,7 @@ function showSetup(game) {
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
       ...(g.noBots || g.solo ? [] : [{ text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) }]),
-      ...(g.solo ? [{ text: '🂠 Нова роздача', fn: () => startLocal(game, { draw: cfg.draw === 3 ? 3 : 1 }, 1) }] : [{ text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) }]),
+      ...(g.solo ? [{ text: game === 'mines' ? '💣 Нова гра' : game === 'spider' ? '🕷 Нова гра' : '🂠 Нова роздача', fn: () => startLocal(game, game === 'mines' ? { size: minesE.sizeOf(cfg) } : game === 'spider' ? { suits: spiderE.suitsOf(cfg) } : { draw: cfg.draw === 3 ? 3 : 1 }, 1) }] : [{ text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) }]),
       ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c0()) }]),
       ...(g.minP <= 2 && !g.solo && game !== 'quiz' ? [{ text: '⚔️ Кинути виклик другу', fn: () => challenge(game, c()) }] : []),
       { text: '📖 Правила', sec: true, fn: () => showRules(game, () => showSetup(game)) },
@@ -940,6 +967,56 @@ function playEvening() {
   findMatch('durak', { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) });
 }
 
+// ---------- clubs ----------
+async function showClub(op, arg) {
+  if (!signedIn) return toast('Клуби — для гравців у Telegram');
+  showPanel({ kind: 'club', icon: '🏠', title: 'Клуб', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  let r = null;
+  try { r = await post('/api/club', op === 'create' ? { op, name: arg } : op === 'join' ? { op, code: arg } : { op: op || 'get' }); } catch (e) {}
+  if (panelKind() !== 'club') return;
+  if (!r) return showPanel({ kind: 'club', icon: '🏠', title: 'Клуб', text: 'Не вдалося завантажити.', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  if (r.err) toast(r.err); else if (op === 'join' && r.club) { toast(`Ви в клубі «${r.club.name}» 🎉`); sfx('chime'); } else if (op === 'create' && r.club) { toast('Клуб створено! Запрошуйте друзів'); sfx('chime'); }
+  const body = document.createElement('div');
+  const topList = () => {
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = '🏆 Клуби тижня (сума очок учасників)';
+    const ol = document.createElement('ol'); ol.className = 'plist top';
+    if (!r.top.length) { const li = document.createElement('li'); li.className = 'free'; li.textContent = 'Ще немає клубів — створіть перший!'; ol.appendChild(li); }
+    r.top.forEach((c, i) => { const li = document.createElement('li'); li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${c.name} — ${c.points} оч. · 👥 ${c.members}`; ol.appendChild(li); });
+    body.append(l, ol);
+  };
+  if (!r.club) {
+    const p = document.createElement('p'); p.className = 'muted';
+    p.textContent = 'Створіть клуб із друзями або вступіть за кодом. Очки учасників за тиждень складаються, а найкращий клуб тижня отримує по +5 кожному!';
+    body.appendChild(p);
+    topList();
+    const ask = (title, ph, fn) => {
+      const b = document.createElement('div'); const inp = document.createElement('input'); inp.className = title === 'Код клубу' ? 'codein' : 'namein'; inp.placeholder = ph; inp.maxLength = 24; b.appendChild(inp);
+      showPanel({ kind: 'club', icon: '🏠', title, body: b, buttons: [{ text: 'Готово', fn: () => fn(inp.value) }, { text: 'Назад', sec: true, fn: () => showClub() }] });
+      setTimeout(() => inp.focus(), 50);
+    };
+    return showPanel({ kind: 'club', icon: '🏠', title: 'Клуби', body, buttons: [
+      { text: '➕ Створити клуб', fn: () => ask('Назва клубу', 'Напр.: Дурні з Києва', v => showClub('create', v)) },
+      { text: '🔑 Вступити за кодом', sec: true, fn: () => ask('Код клубу', '5 літер і цифр', v => showClub('join', v)) },
+      { text: 'Закрити', sec: true, fn: hidePanel }] });
+  }
+  const c = r.club;
+  const box = document.createElement('div'); box.className = 'mecard';
+  const line = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; box.appendChild(d); };
+  line(`🏠 ${c.name}`, 'lvl');
+  line(`Цього тижня: ${c.points} оч. · місце ${c.place} з ${c.clubs} · код ${c.code}`);
+  body.appendChild(box);
+  const ul = document.createElement('ul'); ul.className = 'plist';
+  c.members.forEach(m => { const li = document.createElement('li'); li.textContent = `${m.owner ? '👑 ' : '👤 '}${m.name}${m.me ? ' (ви)' : ''} — ${m.week} оч.`; if (!m.me) { li.className = 'tap'; li.onclick = () => showPlayer(m.pub, () => showClub()); } ul.appendChild(li); });
+  body.appendChild(ul);
+  topList();
+  const link = `${APP_LINK}?startapp=club-${c.code}`;
+  showPanel({ kind: 'club', icon: '🏠', title: c.name, body, buttons: [
+    { text: '📨 Запросити в клуб', fn: () => { if (!inlineShare(`k ${c.code}`)) shareCard({ text: `🏠 Вступай у наш клуб «${c.name}» в «Ігри UA»!`, url: link }); } },
+    { text: '📋 Скопіювати запрошення', sec: true, fn: () => copyText(`🏠 Вступай у наш клуб «${c.name}» в «Ігри UA»! Код: ${c.code}\n${link}`) },
+    { text: '🚪 Вийти з клубу', sec: true, fn: () => showPanel({ kind: 'club', icon: '🚪', title: 'Вийти з клубу?', text: c.members.length === 1 ? 'Ви останній — клуб зникне.' : 'Ваші очки підуть разом із вами.', buttons: [{ text: 'Так, вийти', fn: () => showClub('leave') }, { text: 'Назад', sec: true, fn: () => showClub() }] }) },
+    { text: 'Закрити', sec: true, fn: hidePanel }] });
+}
+
 // ---------- a player's card ----------
 async function showPlayer(pub, back) {
   showPanel({ kind: 'player', icon: '👤', title: 'Гравець', text: 'Завантаження…', buttons: [{ text: 'Назад', sec: true, fn: back || hidePanel }] });
@@ -1177,17 +1254,19 @@ function showReact(m) {
 
 // start parameter: "CODE" (room), "r123" (friend's invite), "CODE_r123" (room link from a friend),
 // "src-NAME" (where the player came from: channel, site, an ad…), "ev" (straight into the evening Durak tournament)
-let startCode = '', startRef = null, startSrc = null, startEvening = false;
+let startCode = '', startRef = null, startSrc = null, startEvening = false, startClub = null;
 for (const part of String((tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || new URLSearchParams(location.search).get('room') || '').split('_')) {
   const src = /^src-([a-z0-9]{1,20})$/.exec(part);
   if (src) startSrc = src[1];
   else if (part === 'ev') startEvening = true;
+  else if (/^club-[A-Z0-9]{5}$/i.test(part)) startClub = part.slice(5).toUpperCase();
   else if (/^r\d{3,15}$/.test(part)) startRef = part.slice(1);
   else if (/^[A-Za-z0-9]{4,8}$/.test(part)) startCode = part.toUpperCase();
 }
 showHub();
 if (startCode) joinRoom(startCode, null);
 else if (startEvening) playEvening();
+else if (startClub) setTimeout(() => showClub('join', startClub), 600);
 sayHello(startRef, startSrc);
 
 // test hook: window.games.start('durak', {variant:'perevod'}, 4)

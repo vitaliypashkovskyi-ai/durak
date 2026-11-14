@@ -30,6 +30,8 @@ import * as quizE from './quiz-engine.js';
 import * as quizUI from './quiz-ui.js';
 import * as prefE from './pref-engine.js';
 import * as prefUI from './pref-ui.js';
+import * as bgammonE from './bgammon-engine.js';
+import * as bgammonUI from './bgammon-ui.js';
 import { SHOP } from './shop.js';
 import { LEVELS, HARD_GAMES, NO_LEVEL, levelOf } from './level.js';
 import { Host } from './host.js';
@@ -74,12 +76,13 @@ GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2
 GAMES.rpoker = { title: 'Розписний покер', icon: '🎯', sub: '2–8 гравців', E: rpokerE, UI: rpokerUI, minP: 2, maxP: 8, defP: 4 };
 GAMES.svara = { title: 'Свара', icon: '🎴', sub: '2–8 гравців', E: svaraE, UI: svaraUI, minP: 2, maxP: 8, defP: 4 };
 GAMES.checkers = { title: 'Шашки', icon: '⚪', sub: '2 гравці', E: checkersE, UI: checkersUI, minP: 2, maxP: 2 };
-GAMES.nardy = { title: 'Нарди', icon: '🎲', sub: '2 гравці, довгі', E: nardyE, UI: nardyUI, minP: 2, maxP: 2 };
+GAMES.nardy = { title: 'Довгі нарди', icon: '🎲', sub: '2 гравці, без бою', E: nardyE, UI: nardyUI, minP: 2, maxP: 2 };
 GAMES.dice = { title: 'Кості', icon: '⚀', sub: '2–6 гравців, покер на костях', E: diceE, UI: diceUI, minP: 2, maxP: 6, defP: 3 };
 GAMES.chess = { title: 'Шахи', icon: '♟', sub: '2 гравці', E: chessE, UI: chessUI, minP: 2, maxP: 2 };
 GAMES.klondike = { title: 'Косинка', icon: '🂠', sub: 'пасьянс для одного', E: klondikeE, UI: klondikeUI, minP: 1, maxP: 1, noRandom: true, solo: true };
 GAMES.quiz = { title: 'Вікторина', icon: '❓', sub: '2–8 гравців', E: quizE, UI: quizUI, minP: 2, maxP: 8, defP: 4 };
 GAMES.pref = { title: 'Преферанс', icon: '🎩', sub: '3 гравці', E: prefE, UI: prefUI, minP: 3, maxP: 3 };
+GAMES.bgammon = { title: 'Короткі нарди', icon: '🎲', sub: '2 гравці, з боєм', E: bgammonE, UI: bgammonUI, minP: 2, maxP: 2 };
 const SOON = [];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
@@ -245,6 +248,7 @@ function showHub() {
   const h = $('hub');
   h.innerHTML = '<div class="hubtop"></div><div class="hubhead">Оберіть гру <span id="online"></span></div><div class="hubgrid"></div>';
   showOnline();
+  eveningBanner(h.querySelector('.hubtop'));
   const top = h.querySelector('.hubtop');
   if (!signedIn) loginButton(top);
   const last = pref('lastRoom', null);
@@ -677,6 +681,7 @@ async function showRating(period) {
   top.forEach((r, i) => {
     const li = document.createElement('li');
     li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name} — ${r.points} оч.` + ((tour || season) && (tour || season).prizes[i] ? ` · приз +${(tour || season).prizes[i]}` : '');
+    if (r.pub) { li.className = 'tap'; li.onclick = () => showPlayer(r.pub, () => showRating(period)); }
     ol.appendChild(li);
   });
   body.appendChild(ol);
@@ -900,6 +905,7 @@ async function showFriends(game) {
       const li = document.createElement('li');
       const n = document.createElement('span');
       n.textContent = `${f.online ? '🟢' : '⚪'} ${f.name}` + (f.online ? ' · онлайн' : f.seen ? ` · ${ago(f.seen)}` : '') + (f.games ? ` · ігор разом: ${f.games}` : '');
+      if (f.pub) { n.className = 'tap'; n.onclick = () => showPlayer(f.pub, () => showFriends(game)); }
       li.appendChild(n);
       const b = document.createElement('button');
       b.textContent = '📣 Покликати';
@@ -914,6 +920,54 @@ async function showFriends(game) {
   showPanel({ kind: 'friends', icon: '👫', title: 'Друзі', body, buttons: [
     { text: '👥 Запросити нових · +15', sec: true, fn: showInviteFriends }, { text: 'Назад', sec: true, fn: back }] });
 }
+// ---------- evening Durak tournament (20:00–21:00 Kyiv) ----------
+let EVENING = null;
+async function eveningBanner(top) {
+  try { EVENING = await (await fetch(`${httpBase()}/api/evening`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: signedIn ? AUTH() : '' }) })).json(); } catch (e) { return; }
+  if (!top.isConnected || !EVENING) return;
+  const ev = EVENING, mins = Math.max(1, Math.round((ev.live ? ev.end - ev.now : ev.start - ev.now) / 60000));
+  if (!ev.live && mins > 180) return;          // show it only in the last 3 hours before the start
+  const b = document.createElement('button');
+  b.className = 'hubact evening' + (ev.live ? ' live' : '');
+  b.textContent = ev.live
+    ? `🔥 Турнір з Дурня йде! Ще ${mins} хв` + (ev.me ? ` · ви ${ev.me.place}-й` : '') + ` · 🥇 +${ev.prizes[0]}`
+    : `🏆 Сьогодні о 20:00 — турнір з Дурня (через ${mins >= 60 ? Math.floor(mins / 60) + ' год ' : ''}${mins % 60} хв)`;
+  b.onclick = ev.live ? playEvening : () => showRules('durak');
+  top.prepend(b);
+}
+function playEvening() {
+  const cfg = Object.assign({ variant: 'podkidnoy', deck: 36 }, pref('cfg.durak', {}));
+  findMatch('durak', { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) });
+}
+
+// ---------- a player's card ----------
+async function showPlayer(pub, back) {
+  showPanel({ kind: 'player', icon: '👤', title: 'Гравець', text: 'Завантаження…', buttons: [{ text: 'Назад', sec: true, fn: back || hidePanel }] });
+  let p = null;
+  try { p = await post('/api/player', { pub }); } catch (e) {}
+  if (panelKind() !== 'player') return;
+  if (!p || !p.ok) return showPanel({ kind: 'player', icon: '👤', title: 'Гравець', text: 'Не вдалося завантажити.', buttons: [{ text: 'Назад', sec: true, fn: back || hidePanel }] });
+  const body = document.createElement('div');
+  const box = document.createElement('div'); box.className = 'mecard';
+  const line = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; box.appendChild(d); };
+  line(`${p.level.name}${p.champion ? ' · 🏆 чемпіон місяця' : ''}${p.vip ? ' · 💎 VIP' : ''}`, 'lvl');
+  line(`${p.points} очок · ${p.wins} перемог з ${p.games} онлайн-ігор` + (p.cups ? ` · кубків турніру: ${p.cups}` : ''));
+  if (p.favs.length) line('Улюблені ігри: ' + p.favs.map(f => `${GAMES[f.game] ? GAMES[f.game].icon + ' ' + GAMES[f.game].title : f.game} (${f.wins})`).join(', '), 'sub');
+  line(p.online ? '🟢 Зараз онлайн' : '⚪ Не в мережі', 'sub');
+  body.appendChild(box);
+  if (p.h2h) {
+    const h = document.createElement('div'); h.className = 'tourbox';
+    h.textContent = p.h2h.games ? `⚔️ Ви проти ${p.name}: ${p.h2h.mine} : ${p.h2h.his} (ігор разом: ${p.h2h.games})` : `⚔️ Ви ще не грали разом — киньте виклик!`;
+    body.appendChild(h);
+  }
+  if (p.achievements.length) {
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Досягнення (${p.achievements.length}):`;
+    const a = document.createElement('div'); a.className = 'pach'; a.textContent = p.achievements.join(' · ');
+    body.append(l, a);
+  }
+  showPanel({ kind: 'player', icon: '👤', title: p.name, body, buttons: [{ text: 'Назад', sec: true, fn: back || hidePanel }] });
+}
+
 function pickGameFor(f) {
   const body = document.createElement('div'); body.className = 'chips';
   Object.entries(GAMES).forEach(([id, g]) => {
@@ -987,10 +1041,10 @@ function showInviteFriends() {
 }
 
 // First visit in Telegram: welcome bonus (and the friend's invite, if the app was opened by his link)
-async function sayHello(ref) {
+async function sayHello(ref, src) {
   if (!signedIn) return;
   try {
-    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), ref }) })).json();
+    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), ref, src }) })).json();
     if (!r.welcome) return;
     sfx('win'); haptic('success');
     const show = () => showPanel({
@@ -1121,15 +1175,20 @@ function showReact(m) {
   sfx('pop');
 }
 
-// start parameter: "CODE" (room), "r123" (friend's invite) or "CODE_r123" (room link from a friend)
-let startCode = '', startRef = null;
+// start parameter: "CODE" (room), "r123" (friend's invite), "CODE_r123" (room link from a friend),
+// "src-NAME" (where the player came from: channel, site, an ad…), "ev" (straight into the evening Durak tournament)
+let startCode = '', startRef = null, startSrc = null, startEvening = false;
 for (const part of String((tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || new URLSearchParams(location.search).get('room') || '').split('_')) {
-  if (/^r\d{3,15}$/.test(part)) startRef = part.slice(1);
+  const src = /^src-([a-z0-9]{1,20})$/.exec(part);
+  if (src) startSrc = src[1];
+  else if (part === 'ev') startEvening = true;
+  else if (/^r\d{3,15}$/.test(part)) startRef = part.slice(1);
   else if (/^[A-Za-z0-9]{4,8}$/.test(part)) startCode = part.toUpperCase();
 }
 showHub();
 if (startCode) joinRoom(startCode, null);
-sayHello(startRef);
+else if (startEvening) playEvening();
+sayHello(startRef, startSrc);
 
 // test hook: window.games.start('durak', {variant:'perevod'}, 4)
 window.games = { start: startLocal, showHub, act: m => api.act(m), get session() { return S; }, get view() { return lastView; } };

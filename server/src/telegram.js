@@ -16,8 +16,9 @@ export const GAMES = {
   rpoker: { icon: '🎯', title: 'Розписний покер' },
   svara: { icon: '🎴', title: 'Свара' },
   checkers: { icon: '⚪', title: 'Шашки' },
-  nardy: { icon: '🎲', title: 'Нарди' },
+  nardy: { icon: '🎲', title: 'Довгі нарди' },
   dice: { icon: '⚀', title: 'Кості' },
+  bgammon: { icon: '🎲', title: 'Короткі нарди' },
   pref: { icon: '🎩', title: 'Преферанс' },
   quiz: { icon: '❓', title: 'Вікторина' },
   klondike: { icon: '🂠', title: 'Косинка' },
@@ -106,6 +107,7 @@ async function paid(msg, env) {
   return tg(env, 'sendMessage', { chat_id: msg.chat.id, parse_mode: 'HTML', text });
 }
 
+export const SOURCE_NAMES = { direct: '🔗 напряму', friend: '👥 від друзів', channel: '📢 канал', group: '💬 чат', site: '🌐 сайт', seo: '🔎 Google', old: '⏳ до міток' };
 export function adminText(a) {
   const name = g => (GAMES[g] ? GAMES[g].icon + ' ' + GAMES[g].title : g);
   const list = rows => (rows.length ? rows.map(r => `${name(r.game)} — ${r.n}`).join('\n') : '—');
@@ -126,7 +128,7 @@ ${list(a.online7)}
 🤖 <b>Ігри з ботами</b> сьогодні ${total(a.botToday)} · за тиждень ${total(a.bot7)}:
 ${bots(a.bot7)}
 
-🔔 Нагадування: можна писати ${a.reminders.canWrite}, вимкнули ${a.reminders.muted}, надіслано сьогодні ${a.reminders.today}
+🔔 Нагадування: можна писати ${a.reminders.canWrite}, вимкнули ${a.reminders.muted}, надіслано сьогодні ${a.reminders.today}\n\n🧭 <b>Звідки прийшли за тиждень</b>: ${a.sources && a.sources.length ? a.sources.map(s => `${SOURCE_NAMES[s.source] || s.source} ${s.n}`).join(' · ') : '—'}
 
 ⭐ <b>Stars</b>: сьогодні ${a.stars.today} · за тиждень ${a.stars.week} · усього ${a.stars.all} (покупців ${a.stars.buyers}, VIP зараз ${a.stars.vips})`;
 }
@@ -138,7 +140,7 @@ export function topText(rows, title) {
 }
 
 // ---------- webhook ----------
-const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand', '/spy': 'spy', '/kozel': 'goat', '/poker': 'rpoker', '/svara': 'svara', '/shashky': 'checkers', '/checkers': 'checkers', '/nardy': 'nardy', '/kosti': 'dice', '/shakhy': 'chess', '/viktoryna': 'quiz', '/preferans': 'pref' };
+const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand', '/spy': 'spy', '/kozel': 'goat', '/poker': 'rpoker', '/svara': 'svara', '/shashky': 'checkers', '/checkers': 'checkers', '/nardy': 'nardy', '/kosti': 'dice', '/shakhy': 'chess', '/viktoryna': 'quiz', '/preferans': 'pref', '/korotki': 'bgammon' };
 
 export async function handleUpdate(update, env, makeRoom) {
   if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
@@ -161,7 +163,7 @@ const menuKeyboard = withPlay => ({
     [{ text: '⚪ Шашки', callback_data: 'new:checkers' }, { text: '🎲 Нарди', callback_data: 'new:nardy' }],
     [{ text: '⚀ Кості', callback_data: 'new:dice' }, { text: '♟ Шахи', callback_data: 'new:chess' }],
     [{ text: '❓ Вікторина', callback_data: 'new:quiz' }, { text: '🎩 Преферанс', callback_data: 'new:pref' }],
-    [{ text: '🏆 Топ тижня', callback_data: 'top' }],
+    [{ text: '🎲 Короткі нарди', callback_data: 'new:bgammon' }, { text: '🏆 Топ тижня', callback_data: 'top' }],
   ],
 });
 const MENU_TEXT = '🎲 <b>Ігри UA</b> — оберіть гру, і бот збере кімнату. Хто натисне «Приєднатися», зайде до вас.';
@@ -215,7 +217,7 @@ async function handleCommand(msg, env, makeRoom) {
     if (admins && (!admins.ok || !admins.result.some(a => a.user && a.user.id === msg.from.id && !a.user.is_bot))) return;
     const text = adminText(await statsCall(env, '/admin', {}));
     if (env.ADMIN_TEST === '1') console.log(text);
-    return reply(text);
+    return reply(text, { reply_markup: { inline_keyboard: [[{ text: '📊 Відкрити панель з графіками', web_app: { url: APP_URL + 'admin/' } }]] } });
   }
   if (priv && cmd === '/paysupport') {
     return reply('💳 <b>Покупки за ⭐ Stars</b>\nЗа зірки продаються лише оформлення (сорочки карт, столи) і VIP-значок — на гру вони не впливають.\nЯкщо з покупкою щось не так — напишіть сюди або в чат @ua_Igry з позначкою «оплата», ми розберемося.');

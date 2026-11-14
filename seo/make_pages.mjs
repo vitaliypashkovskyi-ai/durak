@@ -118,7 +118,7 @@ summary{cursor:pointer;font-weight:700}
 footer{padding:22px 0 40px;color:var(--muted);font-size:14px;border-top:1px solid rgba(255,255,255,.12)}`;
 
 function page(g, rules) {
-  const url = `${SITE}/${g.slug}/`, play = `${BOT}?startapp`;
+  const url = `${SITE}/${g.slug}/`, play = `${BOT}?startapp=src-seo`;
   const desc = `${g.intro.split('. ')[0]}. ${g.players}, безкоштовно, українською — прямо в Telegram.`;
   const ld = [{
     '@context': 'https://schema.org', '@type': 'VideoGame', name: `${g.name} — Ігри UA`, url, inLanguage: 'uk',

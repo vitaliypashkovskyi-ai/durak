@@ -15,20 +15,21 @@ import * as svara from '../../js/svara-engine.js';
 import * as checkers from '../../js/checkers-engine.js';
 import * as nardy from '../../js/nardy-engine.js';
 import * as dice from '../../js/dice-engine.js';
+import * as bgammon from '../../js/bgammon-engine.js';
 import * as pref from '../../js/pref-engine.js';
 import * as quiz from '../../js/quiz-engine.js';
 import * as klondike from '../../js/klondike-engine.js';
 import * as chess from '../../js/chess-engine.js';
 import { Host } from '../../js/host.js';
-import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES, invoiceLink } from './telegram.js';
+import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES, invoiceLink, CHANNEL } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice, chess, klondike, quiz, pref };
-const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2, chess: 2, klondike: 1, quiz: 2, pref: 3 };
-const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6, chess: 2, klondike: 1, quiz: 8, pref: 3 };   // durak, rpoker: depend on the deck
+const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice, chess, klondike, quiz, pref, bgammon };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2, chess: 2, klondike: 1, quiz: 2, pref: 3, bgammon: 2 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6, chess: 2, klondike: 1, quiz: 8, pref: 3, bgammon: 2 };   // durak, rpoker: depend on the deck
 // Random opponent: how many players a table wants. If fewer people are found in MATCH_WAIT_MS,
 // whoever is waiting (2+) starts and bots take the free seats.
-const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6, chess: 2, quiz: 4, pref: 3 };
+const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6, chess: 2, quiz: 4, pref: 3, bgammon: 2 };
 const MATCH_WAIT_MS = 25000;
 const SHARE_PIC = 'https://www.igryua.biz.ua/promo/promo-wide.png';
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
@@ -123,6 +124,27 @@ export default {
       if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
       return json(await statsCall(env, '/notify', { id: user.id, on: !!body.on, pm: body.on ? true : undefined }));
     }
+    if (url.pathname === '/api/evening' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = body.init ? await authenticate({ init: body.init }, env) : null;
+      return json(await statsCall(env, '/evening', { id: user && user.id.startsWith('tg:') ? user.id : null }));
+    }
+    if (url.pathname === '/api/dash' && req.method === 'POST') {
+      // the owner's dashboard: only admins of the news channel
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
+      if (env.ADMIN_TEST !== '1') {
+        const admins = await tg(env, 'getChatAdministrators', { chat_id: CHANNEL });
+        if (!admins.ok || !admins.result.some(a => a.user && 'tg:' + a.user.id === user.id && !a.user.is_bot)) return json({ error: 'not admin' }, 403);
+      }
+      return json(await statsCall(env, '/dash', {}));
+    }
+    if (url.pathname === '/api/player' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = body.init ? await authenticate({ init: body.init }, env) : null;
+      return json(await statsCall(env, '/player', { pub: Number(body.pub) || 0, viewer: user && user.id.startsWith('tg:') ? user.id : null }));
+    }
     if (url.pathname === '/api/season' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = body.init ? await authenticate({ init: body.init }, env) : null;
@@ -143,7 +165,7 @@ export default {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);
       if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
-      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref, pm: user.pm });
+      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref, pm: user.pm, src: body.src });
       if (r.inviter) {
         // tell the friend who invited (works if they have ever opened a chat with the bot)
         ctx.waitUntil(tg(env, 'sendMessage', {
@@ -180,7 +202,7 @@ export default {
   // weekly top in the news channel (cron in wrangler.toml)
   async scheduled(event, env, ctx) {
     if (event.cron === '0 17 * * SUN') ctx.waitUntil(statsCall(env, '/weekly', {}));
-    else ctx.waitUntil(statsCall(env, '/remind', {}));
+    else ctx.waitUntil(statsCall(env, '/hourly', {}));   // evening tournament, reminders, season (by Kyiv hour)
   },
 };
 
@@ -545,7 +567,7 @@ export class Room {
         const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
         res = G.winner === team ? 'win' : 'lose';
         don = team === 'mafia';
-      } else if (G.game === 'checkers' || G.game === 'nardy' || G.game === 'chess') {
+      } else if (G.game === 'checkers' || G.game === 'nardy' || G.game === 'chess' || G.game === 'bgammon') {
         res = G.winner === -1 ? 'draw' : G.winner === i ? 'win' : 'lose';
       } else if (G.game === 'rpoker' || G.game === 'svara' || G.game === 'dice' || G.game === 'quiz' || G.game === 'pref') {
         res = G.winners.includes(i) ? (G.winners.length > 1 ? 'draw' : 'win') : 'lose';

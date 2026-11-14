@@ -579,7 +579,7 @@ function showResult(v) {
     if (others) text += (text ? '\n' : '') + `Ще раз хочуть: ${others}`;
     buttons.push({ text: mine ? 'Чекаємо інших…' : 'Ще раз', disabled: mine, fn: () => netSend({ t: 'again' }) });
   }
-  if (r.res === 'win') buttons.unshift({ text: '📣 Поділитися перемогою', fn: () => shareWin(v.game, r) });
+  if (r.res === 'win') buttons.unshift({ text: '📣 Поділитися перемогою', fn: () => shareWin(v.game, r) }, { text: '📋 Скопіювати', sec: true, fn: () => copyText(winText(v.game, r) + '\n' + myLink()) });
   buttons.push({ text: 'Меню ігор', sec: true, fn: showHub });
   showPanel({ kind: 'result', icon: r.icon, title: r.title, text, buttons });
 }
@@ -845,7 +845,7 @@ function showLobby(m) {
   const buttons = [
     ...(signedIn ? [{ text: '👫 Покликати друга', fn: () => showFriends(m.game) }] : []),
     { text: '📨 Запросити в Telegram', fn: shareInvite },
-    { text: '📋 Скопіювати посилання', sec: true, fn: copyInvite },
+    { text: '📋 Скопіювати запрошення', sec: true, fn: copyInvite },
   ];
   if (isHost) {
     const bots = m.seats.filter(s => s.bot).length, noBots = GAMES[m.game].noBots;
@@ -1004,56 +1004,35 @@ async function sayHello(ref) {
 function shareInvite() {
   if (!S || !S.code) return;
   const g = GAMES[S.game] || GAMES.durak;
-  shareCard({ text: `🎲 Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}`, url: inviteLink(), button: `▶ Приєднатися (${g.title})` });
+  // exactly yesterday's working invitation
+  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}\n(@IgryUA_bot → «Грати» → «Увійти за кодом»)`);
+  if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
 }
 
-// Send something to any chat: in new Telegram — a card with a picture and a button (prepared message),
-// otherwise the usual «share a link» window.
-async function shareCard({ text, url, button }) {
-  const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
-  // Telegram's own share window, exactly as before 2026-11-14 (the user asked to remove the extra window)
-  const fallback = () => {
-    if (!inTelegram) return window.open(shareUrl, '_blank');
-    // Telegram's share window (works on phones, whatever the platform is called there)
-    try { if (tg.openTelegramLink) tg.openTelegramLink(shareUrl); } catch (e) {}
-    // Telegram on a computer ignores it: copy the invitation as well. «Computer» is decided by the device
-    // (a mouse, no touch screen), not by tg.platform — the user's phone reported a desktop-like platform.
-    const computer = window.matchMedia && matchMedia('(pointer: fine)').matches && !navigator.maxTouchPoints;
-    if (!computer) return;
-    const all = text + '\n' + url;
-    const ok = () => toast('Скопійовано — вставте другу в чат (Ctrl+V)');
-    const fail = () => toast('Не вдалося скопіювати — скористайтеся «📋 Скопіювати посилання»');
-    try {
-      if (navigator.clipboard) navigator.clipboard.writeText(all).then(ok, () => {
-        const t = document.createElement('textarea'); t.value = all; document.body.appendChild(t); t.select();
-        const done = document.execCommand('copy'); t.remove(); done ? ok() : fail();
-      });
-      else fail();
-    } catch (e) { fail(); }
+// Send something to any chat: Telegram's share window, exactly the code that worked on phones
+// (no device checks). On a computer Telegram ignores it — there is a separate «📋 Скопіювати» button.
+function shareCard({ text, url }) {
+  const u = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+  if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank');
+}
+// copy an invitation (text + link) — works everywhere, used by the «📋» buttons
+function copyText(text) {
+  const ok = () => toast('Скопійовано — вставте другу в чат');
+  const viaArea = () => {
+    const t = document.createElement('textarea'); t.value = text; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    let done = false; try { done = document.execCommand('copy'); } catch (e) {}
+    t.remove();
+    if (done) ok(); else toast('Не вдалося скопіювати');
   };
-  // Picture cards (tg.shareMessage) did not open on the user's phone (2026-11-14), so they are off:
-  // phones get Telegram's own share window, computers the copy window. Set CARDS = true to try again.
-  const CARDS = false;
-  const phone = inTelegram && ['android', 'ios'].includes(tg.platform);
-  if (!CARDS || !phone || !tg.shareMessage || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return fallback();
-  toast('Відкриваю…');
-  try {
-    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 6000);
-    const r = await (await fetch(`${httpBase()}/api/share`, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), text, url, button }) })).json();
-    clearTimeout(timer);
-    if (!r.id) return fallback();
-    // Telegram reports a failure by an event; anything but «the user closed it» → the plain window
-    const onFail = e => { tg.offEvent('shareMessageFailed', onFail); if (!e || e.error !== 'USER_DECLINED') fallback(); };
-    tg.onEvent('shareMessageFailed', onFail);
-    tg.shareMessage(r.id, sent => { tg.offEvent('shareMessageFailed', onFail); if (sent) { toast('Надіслано 👍'); haptic('success'); } });
-  } catch (e) { fallback(); }
+  try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, viaArea); else viaArea(); } catch (e) { viaArea(); }
 }
 const myLink = () => (myTgId() ? personalLink() : APP_LINK);
 
 // a win worth telling about
+const winText = (game, r) => { const g = GAMES[game]; return `🏆 ${g.icon} ${g.title}: ${r.title.replace(/[!.]+$/, '')}!${r.text ? '\n' + r.text.split('\n')[0] : ''}\n\nЗможеш краще? Грай зі мною в «Ігри UA» 🎲`; };
 function shareWin(game, r) {
-  const g = GAMES[game];
-  shareCard({ text: `🏆 ${g.icon} ${g.title}: ${r.title.replace(/[!.]+$/, '')}!${r.text ? '\n' + r.text.split('\n')[0] : ''}\n\nЗможеш краще? Грай зі мною в «Ігри UA» 🎲`, url: myLink(), button: `${g.icon} Зіграти в ${g.title}` });
+  shareCard({ text: winText(game, r), url: myLink() });
 }
 // a 1-on-1 challenge: a new room, the friend gets a card with «Прийняти виклик»
 function challenge(game, cfg) {
@@ -1062,10 +1041,9 @@ function challenge(game, cfg) {
 }
 function copyInvite() {
   if (!S || !S.code) return;
-  const t = inviteLink();
-  const done = () => toast('Посилання скопійовано');
-  if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, () => prompt('Посилання:', t));
-  else prompt('Посилання:', t);
+  const g = GAMES[S.game] || GAMES.durak;
+  copyText(`🎲 Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}
+${inviteLink()}`);
 }
 
 function findMatch(game, cfg) {

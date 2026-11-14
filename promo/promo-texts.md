@@ -1,6 +1,7 @@
 # Рекламні тексти «Ігри UA 🎲»
 
 Посилання на бота: https://t.me/IgryUA_bot
+Сайт: https://www.igryua.biz.ua/igry/
 Ваше особисте посилання (+15 очок за кожного нового друга): у боті → «👥 Запросити друзів».
 Порада: у чатах краще давати **особисте** посилання — тоді нові гравці приносять вам очки.
 
@@ -9,24 +10,23 @@
 ## 1. Короткий — для чатів і друзів
 
 🎲 Знайшов класні ігри прямо в Telegram — нічого не треба встановлювати!
-🃏 Дурень · 🎯 Розписний покер · 🂡 Тисяча · 🐐 Козел · 🎭 Мафія · 🕵️ Шпигун · 🚢 Морський бій
+🃏 Дурень · 🎯 Покер · 🎩 Преферанс · ♟ Шахи · 🎲 Нарди · 🂡 Тисяча · 🎭 Мафія · ❓ Вікторина і ще 7 ігор
 Граю з друзями й ботами. Заходь 👉 https://t.me/IgryUA_bot
 
 ---
 
 ## 2. Середній — для груп і каналів
 
-🎲 **Ігри UA — карткові й настільні ігри з друзями прямо в Telegram**
+🎲 **Ігри UA — 15 карткових, настільних і компанійських ігор прямо в Telegram**
 
-🃏 Дурень — підкидний і переводний, до 12 гравців
-🎯 Розписний покер — замов взятки й влуч
-🂡 Тисяча, 🐐 Козел (2 на 2)
-🎭 Мафія та 🕵️ Шпигун — для компанії
-🚢 Морський бій
+🃏 Дурень (підкидний і переводний, до 12 гравців) · 🎯 Розписний покер · 🎴 Свара
+🂡 Тисяча · 🐐 Козел · 🎩 Преферанс
+♟ Шахи · ⚪ Шашки · 🎲 Нарди · ⚀ Кості · 🂠 Косинка
+🎭 Мафія · 🕵️ Шпигун · ❓ Вікторина · 🚢 Морський бій
 
-✅ Без завантажень і реєстрації — відкривається в Telegram
-👥 Кімнати для друзів за посиланням, боти, випадкові суперники
-🏆 Рейтинг, 🎁 бонус дня, досягнення й нове оформлення за рівні
+✅ Без завантажень і реєстрації — відкривається в Telegram, українською
+👥 Кімнати для друзів за посиланням, випадкові суперники, боти трьох рівнів
+🏆 Турнір тижня й сезони з призами, рейтинг, завдання дня, бонус дня
 
 Грати 👉 https://t.me/IgryUA_bot
 Новини 👉 @UAIgry · Чат гравців 👉 @ua_Igry
@@ -36,20 +36,21 @@
 ## 3. Для каталогів (українською)
 
 **Назва:** Ігри UA
-**Короткий опис (до ~100 символів):** Дурень, покер, Тисяча, Мафія, Шпигун і Морський бій з друзями в Telegram
+**Короткий опис (до ~100 символів):** Дурень, Покер, Преферанс, Шахи, Нарди, Мафія й ще 9 ігор — з друзями в Telegram
 **Опис:**
-Ігри UA — збірка популярних карткових і компанійських ігор прямо в Telegram: Дурень (підкидний, переводний, до 12 гравців), Розписний покер, Тисяча, Козел, Мафія, Шпигун і Морський бій. Грайте з ботами або кличте друзів у кімнату одним посиланням. Рейтинг гравців, щоденний бонус, досягнення й нове оформлення карт за рівні. Без реєстрації й завантажень, українською мовою.
+Ігри UA — 15 популярних ігор українською прямо в Telegram. Карткові: Дурень (підкидний і переводний, до 12 гравців), Розписний покер, Свара, Тисяча, Козел, Преферанс, пасьянс Косинка. Настільні: Шахи, Шашки, Нарди, Кості, Морський бій. Компанійські: Мафія, Шпигун, Вікторина. Грайте з ботами трьох рівнів, кличте друзів у кімнату одним посиланням або знайдіть випадкового суперника. Турнір тижня й місячні сезони з призами, рейтинг, завдання й бонус дня, досягнення. Без реєстрації й завантажень.
 **Категорія:** Games (Ігри)
 **Посилання:** https://t.me/IgryUA_bot
+**Іконка:** `promo-square.png` · **Банер:** `promo-wide.png`
 
 ---
 
 ## 4. For catalogs (English)
 
-**Name:** Igry UA — card & party games
-**Short description:** Durak, poker, Thousand, Mafia, Spy and Battleship with friends in Telegram
+**Name:** Igry UA — card, board & party games
+**Short description:** Durak, poker, chess, backgammon, Mafia and 10 more games with friends in Telegram
 **Description:**
-A collection of popular Ukrainian card and party games right inside Telegram: Durak (throw-in and transfer, up to 12 players), Painted Poker (bid your tricks), Thousand, Kozel (2 vs 2), Mafia, Spy and Battleship. Play against bots or invite friends to a room with one link. Player rating, daily bonus, achievements and new card designs as you level up. No sign-up, no downloads. Interface in Ukrainian.
+15 popular games in Ukrainian right inside Telegram. Cards: Durak (throw-in and transfer, up to 12 players), Painted Poker, Svara, Thousand, Kozel, Preferans and Klondike solitaire. Board games: Chess, Checkers, Long Backgammon (Nardy), Dice Poker, Battleship. Party games: Mafia, Spy, Quiz. Play against bots of three levels, invite friends to a room with one link or find a random opponent. Weekly tournament and monthly seasons with prizes, rating, daily quests and daily bonus, achievements. No sign-up, no downloads.
 **Category:** Games
 **Link:** https://t.me/IgryUA_bot
 
@@ -57,8 +58,8 @@ A collection of popular Ukrainian card and party games right inside Telegram: Du
 
 ## Куди подати бота
 
-- **Telegram Apps Center** — бот @tapps_bot (команда «Add app» / «Submit»): назва, опис, іконка 512×512, посилання. Потрібна квадратна картинка → `promo-square.png`.
-- **Каталоги ботів:** @BotoGraf, @StoreBot та подібні — зазвичай досить посилання й короткого опису.
+- **Telegram Apps Center** (офіційний каталог Mini Apps). Спосіб подачі змінюється — за відкритими джерелами, заявку подають через бот **@app_moderation_bot**; деякі гайди пишуть, що каталог лише за запрошенням і питати треба в **@BotSupport**. Почніть з @app_moderation_bot.
+- **Каталоги ботів:** @BotoGraf, @StoreBot та подібні — зазвичай досить посилання й короткого опису (перевірте, що бот каталогу живий).
 - **Групи про ігри / Telegram-ігри** — середній текст + `promo-wide.png`.
 
-Перед поданням у каталоги варто поставити **аватарку бота** (BotFather → /mybots → @IgryUA_bot → Edit Bot → Edit Botpic) — квадратна `promo-square.png` підійде.
+Аватарка бота вже стоїть.

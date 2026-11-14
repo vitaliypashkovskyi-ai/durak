@@ -4,7 +4,7 @@ import * as durak from '../../js/durak-engine.js';
 
 export const BOT = 'IgryUA_bot';
 export const CHANNEL = '@UAIgry';
-export const APP_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
+export const APP_URL = 'https://www.igryua.biz.ua/';
 export const GAMES = {
   durak: { icon: '🃏', title: 'Дурень' },
   battle: { icon: '🚢', title: 'Морський бій' },

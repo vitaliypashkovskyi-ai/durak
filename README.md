@@ -23,7 +23,7 @@ python -m http.server 8137 --directory D:/Durak
 ```
 Відкрити http://localhost:8137
 
-Гра онлайн: https://vitaliypashkovskyi-ai.github.io/durak/
+Гра онлайн: https://www.igryua.biz.ua/
 
 ## Гра з друзями (сервер)
 `server/` — Cloudflare Worker + Durable Objects: `wss://durak.durak-server.workers.dev`.

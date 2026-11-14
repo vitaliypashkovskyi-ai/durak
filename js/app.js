@@ -18,7 +18,7 @@ import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
 const APP_LINK = 'https://t.me/IgryUA_bot';    // bot's main Mini App: ?startapp=CODE
-const PAGE_URL = 'https://vitaliypashkovskyi-ai.github.io/durak/';
+const PAGE_URL = 'https://www.igryua.biz.ua/';
 const COMMUNITY = 'https://t.me/UAIgry';                 // news channel
 const CHAT = 'https://t.me/ua_Igry';                     // players' chat (public group linked to the channel)
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];

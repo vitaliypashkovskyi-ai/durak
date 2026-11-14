@@ -32,7 +32,7 @@ def load_env():
 
 load_env()
 TOKEN = os.environ.get("BOT_TOKEN", "").strip()
-GAME_URL = os.environ.get("GAME_URL", "https://vitaliypashkovskyi-ai.github.io/durak/").strip()
+GAME_URL = os.environ.get("GAME_URL", "https://www.igryua.biz.ua/").strip()
 API = f"https://api.telegram.org/bot{TOKEN}/"
 
 WELCOME = (

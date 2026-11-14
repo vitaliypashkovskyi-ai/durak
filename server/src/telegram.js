@@ -18,6 +18,10 @@ export const GAMES = {
   checkers: { icon: '⚪', title: 'Шашки' },
   nardy: { icon: '🎲', title: 'Нарди' },
   dice: { icon: '⚀', title: 'Кості' },
+  pref: { icon: '🎩', title: 'Преферанс' },
+  quiz: { icon: '❓', title: 'Вікторина' },
+  klondike: { icon: '🂠', title: 'Косинка' },
+  chess: { icon: '♟', title: 'Шахи' },
 };
 export const joinUrl = code => `https://t.me/${BOT}?startapp=${code}`;
 
@@ -102,7 +106,7 @@ export function topText(rows, title) {
 }
 
 // ---------- webhook ----------
-const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand', '/spy': 'spy', '/kozel': 'goat', '/poker': 'rpoker', '/svara': 'svara', '/shashky': 'checkers', '/checkers': 'checkers', '/nardy': 'nardy', '/kosti': 'dice' };
+const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', '/thousand': 'thousand', '/spy': 'spy', '/kozel': 'goat', '/poker': 'rpoker', '/svara': 'svara', '/shashky': 'checkers', '/checkers': 'checkers', '/nardy': 'nardy', '/kosti': 'dice', '/shakhy': 'chess', '/viktoryna': 'quiz', '/preferans': 'pref' };
 
 export async function handleUpdate(update, env, makeRoom) {
   if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
@@ -122,7 +126,9 @@ const menuKeyboard = withPlay => ({
     [{ text: '🕵️ Шпигун', callback_data: 'new:spy' }, { text: '🐐 Козел', callback_data: 'new:goat' }],
     [{ text: '🎯 Розписний покер', callback_data: 'new:rpoker' }, { text: '🎴 Свара', callback_data: 'new:svara' }],
     [{ text: '⚪ Шашки', callback_data: 'new:checkers' }, { text: '🎲 Нарди', callback_data: 'new:nardy' }],
-    [{ text: '⚀ Кості', callback_data: 'new:dice' }, { text: '🏆 Топ тижня', callback_data: 'top' }],
+    [{ text: '⚀ Кості', callback_data: 'new:dice' }, { text: '♟ Шахи', callback_data: 'new:chess' }],
+    [{ text: '❓ Вікторина', callback_data: 'new:quiz' }, { text: '🎩 Преферанс', callback_data: 'new:pref' }],
+    [{ text: '🏆 Топ тижня', callback_data: 'top' }],
   ],
 });
 const MENU_TEXT = '🎲 <b>Ігри UA</b> — оберіть гру, і бот збере кімнату. Хто натисне «Приєднатися», зайде до вас.';

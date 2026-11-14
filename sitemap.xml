@@ -56,6 +56,26 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://www.igryua.biz.ua/shakhy/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.igryua.biz.ua/kosynka/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.igryua.biz.ua/viktoryna/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.igryua.biz.ua/preferans/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://www.igryua.biz.ua/kosti/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>

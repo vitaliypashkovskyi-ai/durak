@@ -15,16 +15,20 @@ import * as svara from '../../js/svara-engine.js';
 import * as checkers from '../../js/checkers-engine.js';
 import * as nardy from '../../js/nardy-engine.js';
 import * as dice from '../../js/dice-engine.js';
+import * as pref from '../../js/pref-engine.js';
+import * as quiz from '../../js/quiz-engine.js';
+import * as klondike from '../../js/klondike-engine.js';
+import * as chess from '../../js/chess-engine.js';
 import { Host } from '../../js/host.js';
 import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES, invoiceLink } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice };
-const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2 };
-const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6 };   // durak, rpoker: depend on the deck
+const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice, chess, klondike, quiz, pref };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2, chess: 2, klondike: 1, quiz: 2, pref: 3 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6, chess: 2, klondike: 1, quiz: 8, pref: 3 };   // durak, rpoker: depend on the deck
 // Random opponent: how many players a table wants. If fewer people are found in MATCH_WAIT_MS,
 // whoever is waiting (2+) starts and bots take the free seats.
-const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6 };
+const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6, chess: 2, quiz: 4, pref: 3 };
 const MATCH_WAIT_MS = 25000;
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
 const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
@@ -294,7 +298,9 @@ function roomConfig(c) {
     cfg.max = rpoker.DECKS[cfg.deck].max;
   }
   if (c.game === 'svara') cfg.length = svara.lengthOf(c);
+  if (c.game === 'pref') cfg.length = pref.lengthOf(c);
   if (c.level === 'easy' || c.level === 'hard') cfg.level = c.level;   // bots in this room
+  if (c.game === 'quiz' && typeof c.cat === 'string' && /^[a-z]{2,6}$/.test(c.cat)) cfg.cat = c.cat;
   if (Number.isInteger(c.auto) && c.auto >= 2 && c.auto <= cfg.max) {
     cfg.auto = c.auto;
     cfg.fill = Math.max(cfg.min, Math.min(cfg.max, Number(c.fill) || c.auto));
@@ -524,9 +530,9 @@ export class Room {
         const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
         res = G.winner === team ? 'win' : 'lose';
         don = team === 'mafia';
-      } else if (G.game === 'checkers' || G.game === 'nardy') {
+      } else if (G.game === 'checkers' || G.game === 'nardy' || G.game === 'chess') {
         res = G.winner === -1 ? 'draw' : G.winner === i ? 'win' : 'lose';
-      } else if (G.game === 'rpoker' || G.game === 'svara' || G.game === 'dice') {
+      } else if (G.game === 'rpoker' || G.game === 'svara' || G.game === 'dice' || G.game === 'quiz' || G.game === 'pref') {
         res = G.winners.includes(i) ? (G.winners.length > 1 ? 'draw' : 'win') : 'lose';
       } else if (G.game === 'goat') {
         res = G.winner === i % 2 ? 'win' : 'lose';

@@ -22,6 +22,14 @@ import * as nardyE from './nardy-engine.js';
 import * as nardyUI from './nardy-ui.js';
 import * as diceE from './dice-engine.js';
 import * as diceUI from './dice-ui.js';
+import * as chessE from './chess-engine.js';
+import * as chessUI from './chess-ui.js';
+import * as klondikeE from './klondike-engine.js';
+import * as klondikeUI from './klondike-ui.js';
+import * as quizE from './quiz-engine.js';
+import * as quizUI from './quiz-ui.js';
+import * as prefE from './pref-engine.js';
+import * as prefUI from './pref-ui.js';
 import { SHOP } from './shop.js';
 import { LEVELS, HARD_GAMES, NO_LEVEL, levelOf } from './level.js';
 import { Host } from './host.js';
@@ -68,7 +76,11 @@ GAMES.svara = { title: 'Свара', icon: '🎴', sub: '2–8 гравців', 
 GAMES.checkers = { title: 'Шашки', icon: '⚪', sub: '2 гравці', E: checkersE, UI: checkersUI, minP: 2, maxP: 2 };
 GAMES.nardy = { title: 'Нарди', icon: '🎲', sub: '2 гравці, довгі', E: nardyE, UI: nardyUI, minP: 2, maxP: 2 };
 GAMES.dice = { title: 'Кості', icon: '⚀', sub: '2–6 гравців, покер на костях', E: diceE, UI: diceUI, minP: 2, maxP: 6, defP: 3 };
-const SOON = [['♟', 'Шахи'], ['🂠', 'Косинка'], ['❓', 'Вікторина'], ['🎩', 'Преферанс']];
+GAMES.chess = { title: 'Шахи', icon: '♟', sub: '2 гравці', E: chessE, UI: chessUI, minP: 2, maxP: 2 };
+GAMES.klondike = { title: 'Косинка', icon: '🂠', sub: 'пасьянс для одного', E: klondikeE, UI: klondikeUI, minP: 1, maxP: 1, noRandom: true, solo: true };
+GAMES.quiz = { title: 'Вікторина', icon: '❓', sub: '2–8 гравців', E: quizE, UI: quizUI, minP: 2, maxP: 8, defP: 4 };
+GAMES.pref = { title: 'Преферанс', icon: '🎩', sub: '3 гравці', E: prefE, UI: prefUI, minP: 3, maxP: 3 };
+const SOON = [];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 
@@ -424,6 +436,9 @@ function showSetup(game) {
   }
   const ns = [];
   for (let k = g.minP; k <= maxP; k++) ns.push([k, String(k)]);
+  if (game === 'pref') chips('Тривалість', Object.entries(prefE.LENGTHS).map(([k, x]) => [k, `${x.label} · ${x.deals} роздач`]), prefE.lengthOf(cfg), v => { cfg.length = v; });
+  if (game === 'quiz') chips('Тема', [['', '🎲 Усі теми'], ...Object.entries(quizE.CATS)], cfg.cat || '', v => { cfg.cat = v; });
+  if (g.solo) chips('Колода', [[1, 'По 1 карті (легше)'], [3, 'По 3 карти (складніше)']], cfg.draw === 3 ? 3 : 1, v => { cfg.draw = v; });
   if (ns.length > 1 && !g.noBots) chips('Гравців у грі з ботами', ns, cfg.n, v => { cfg.n = v; });
   if (g.noBots) { const l = document.createElement('div'); l.className = 'lbl'; l.textContent = `Гра для живих людей: ${g.minP}–${g.maxP} гравців. Створіть кімнату й запросіть друзів.`; body.appendChild(l); }
   if (!NO_LEVEL.includes(game) && !g.noBots) {
@@ -433,13 +448,13 @@ function showSetup(game) {
   const s = stat(game);
   const c0 = () => (g.variants ? { variant: durakE.variantOf(cfg), deck: durakE.deckOf(cfg) }
     : game === 'rpoker' ? { deck: rpokerE.deckOf(cfg), length: cfg.length === 'short' ? 'short' : 'full' }
-    : game === 'svara' ? { length: svaraE.lengthOf(cfg) } : {});
+    : game === 'svara' ? { length: svaraE.lengthOf(cfg) } : game === 'quiz' && quizE.CATS[cfg.cat] ? { cat: cfg.cat } : game === 'pref' ? { length: prefE.lengthOf(cfg) } : {});
   const c = () => Object.assign(c0(), NO_LEVEL.includes(game) ? {} : { level: levelOf(cfg) });
   showPanel({
     kind: 'setup', icon: g.icon, title: g.title, text: `Перемог: ${s.win} · Поразок: ${s.lose}`, body,
     buttons: [
-      ...(g.noBots ? [] : [{ text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) }]),
-      { text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) },
+      ...(g.noBots || g.solo ? [] : [{ text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) }]),
+      ...(g.solo ? [{ text: '🂠 Нова роздача', fn: () => startLocal(game, { draw: cfg.draw === 3 ? 3 : 1 }, 1) }] : [{ text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) }]),
       ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c0()) }]),
       { text: '📖 Правила', sec: true, fn: () => showRules(game, () => showSetup(game)) },
       { text: 'Назад', sec: true, fn: hidePanel },
@@ -502,6 +517,8 @@ function shiftTimes(G, dt) {
   if (G.botNext) for (const k in G.botNext) G.botNext[k] += dt;
   if (G.ask) for (const k in G.ask) if (G.ask[k]) G.ask[k].at += dt;
   if (G.lastSay) for (const k in G.lastSay) G.lastSay[k] += dt;
+  if (Array.isArray(G.botAt)) G.botAt = G.botAt.map(t => (t ? t + dt : t));
+  if (typeof G.started === 'number') G.started += dt;
 }
 function savedGame() {
   const s = pref('saved', null);

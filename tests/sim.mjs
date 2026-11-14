@@ -10,6 +10,9 @@ import * as svara from '../js/svara-engine.js';
 import * as checkers from '../js/checkers-engine.js';
 import * as nardy from '../js/nardy-engine.js';
 import * as dice from '../js/dice-engine.js';
+import * as chess from '../js/chess-engine.js';
+import * as pref from '../js/pref-engine.js';
+import * as klondike from '../js/klondike-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -183,5 +186,24 @@ for (let n = 5; n <= 12; n++) {
     const r = run(dice, {}, n, 10, G => { if (G.over && !G.__t) { G.__t = 1; G.sheets.forEach(s => tot.push(dice.totals(s).all)); } });
     console.log(`dice n=${n}: avg score ${Math.round(tot.reduce((a, b) => a + b, 0) / tot.length)}`, 'winners', r.outcomes);
   }
+}
+{
+  const r = run(chess, {}, 2, 2, null);
+  console.log('chess: results', r.outcomes, 'avg plies', Math.round(r.steps / r.games));
+}
+{
+  const r = run(pref, {}, 3, 8, G => {
+    if (G.phase === 'play') { const n = G.hands.flat().length + G.trick.length + G.tricks.reduce((a, b) => a + b, 0) * 3; if (n !== 30) throw new Error('pref cards ' + n); }
+  });
+  console.log('pref: winners', r.outcomes);
+}
+{
+  let won = 0;
+  for (let g = 0; g < 100; g++) {
+    const G = klondike.create({}, [{ name: 'A' }]); let n = 0, draws = 0;
+    while (!G.over && n++ < 3000) { const m = klondike.hint(G); if (!m || draws > 60) break; draws = m.t === 'draw' ? draws + 1 : 0; if (!klondike.act(G, 0, m)) throw new Error('klondike rejected'); }
+    if (G.won) won++;
+  }
+  console.log('klondike: greedy hint player won', won, 'of 100');
 }
 console.log('OK');

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Ігри UA — Дурень, Покер, Тисяча, Мафія</title>
-<meta name="description" content="Дурень, Розписний покер, Свара, Тисяча, Козел, Мафія, Шпигун, Морський бій, Шашки, Нарди й Кості з друзями або ботами прямо в Telegram — @IgryUA_bot.">
+<meta name="description" content="Дурень, Розписний покер, Свара, Тисяча, Козел, Мафія, Шпигун, Морський бій, Шашки, Нарди, Кості, Шахи, Преферанс, Вікторина й Косинка з друзями або ботами прямо в Telegram — @IgryUA_bot.">
 <link rel="canonical" href="https://www.igryua.biz.ua/igry/">
 <meta property="og:title" content="Ігри UA — Дурень, Покер, Тисяча, Мафія у Telegram">
 <meta property="og:description" content="Карткові й компанійські ігри з друзями прямо в Telegram.">
@@ -54,7 +54,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 41;
+  var PAGE_VERSION = 42;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -311,6 +311,61 @@ body[data-table="ocean"]{--felt:#13807d;--felt2:#073838}
 .pc.mv{box-shadow:0 0 0 3px #7cd65a,inset 0 -3px 0 rgba(0,0,0,.25)}
 .pc.gone{opacity:.35}
 
+/* chess */
+.ckboard.chess .ck{position:relative}
+.cp{font-size:min(9.5vw,46px,6.2vh);line-height:1;user-select:none;font-family:"Segoe UI Symbol","DejaVu Sans","Noto Sans Symbols 2",serif}
+.cp.w{color:#fff;text-shadow:0 0 1px #000,0 0 1px #000,0 1px 2px rgba(0,0,0,.8)}
+.cp.b{color:#141414;text-shadow:0 0 1px #fff8,0 1px 1px rgba(255,255,255,.35)}
+.cp.mv{text-shadow:0 0 6px #7cd65a,0 0 2px #2e7d32}
+.cp.w.mv{text-shadow:0 0 1px #000,0 0 7px #7cd65a}
+.ck.hit{box-shadow:inset 0 0 0 4px rgba(124,214,90,.9)}
+.ck.chk{background:radial-gradient(circle,#ff5252 0 35%,#b71c1c 80%)}
+.crd{position:absolute;font-style:normal;font-size:9px;font-weight:700;opacity:.55;color:#3b2a1a}
+.crd.r{left:2px;top:1px}
+.crd.f{right:2px;bottom:0}
+
+/* klondike */
+.g-klondike{--kw:calc((min(100vw,520px) - 34px) / 7)}
+.klinfo{text-align:center;color:#fff;font-size:13px;opacity:.85;margin:2px 0 6px}
+.kltop,.kltab{display:grid;grid-template-columns:repeat(7,var(--kw));gap:4px;justify-content:center}
+.g-klondike .card{--cw:var(--kw)}
+.g-klondike .card .c{font-size:calc(var(--cw)*.3)}
+.g-klondike .card .m{font-size:calc(var(--cw)*.5)}
+.klslot{position:relative;height:calc(var(--kw)*1.42);cursor:pointer}
+.klslot .card{position:absolute;left:0;top:0}
+.klslot.waste .card.fan1{left:calc(var(--kw)*.18)}
+.klslot.waste .card.fan2{left:calc(var(--kw)*.36)}
+.klempty{width:100%;height:100%;border:2px dashed rgba(255,255,255,.3);border-radius:6px;display:grid;place-items:center;color:rgba(255,255,255,.45);font-size:calc(var(--kw)*.45);box-sizing:border-box}
+.kltab{margin-top:10px;min-height:55vh}
+.klcol{position:relative;min-height:calc(var(--kw)*1.42)}
+.klcol .card{position:absolute;left:0}
+.klcol .klempty{height:calc(var(--kw)*1.42)}
+.g-klondike .card.sel{box-shadow:0 0 0 3px #7cd65a,0 2px 6px rgba(0,0,0,.35)}
+
+/* quiz */
+.qzhead{text-align:center;color:#fff;font-size:13px;opacity:.85;margin:4px 0}
+.qztimer{height:6px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden;max-width:520px;margin:0 auto 10px}
+.qztimer span{display:block;height:100%;background:#7cd65a;transition:width .2s linear}
+.qztimer span.low{background:#ff7043}
+.qzq{background:var(--card);color:#1b1b1b;border-radius:14px;padding:16px;font-size:18px;font-weight:700;text-align:center;max-width:520px;margin:0 auto 10px;line-height:1.35}
+.qzopts{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:520px;margin:0 auto}
+.qzopt{border:0;border-radius:12px;padding:14px 10px;font-size:16px;font-weight:600;background:rgba(255,255,255,.92);color:#1b1b1b;cursor:pointer;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.qzopt:disabled{cursor:default;opacity:1}
+.qzopt.mine{background:#bbdefb;box-shadow:0 0 0 3px #2f6fd6}
+.qzopt.right{background:#a5d6a7;box-shadow:0 0 0 3px #2e7d32}
+.qzopt.wrong{background:#ffcdd2;box-shadow:0 0 0 3px #c62828}
+.qzopt small{font-size:11px;font-weight:400;opacity:.75}
+.qzscores{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:12px}
+.qzp{background:rgba(0,0,0,.22);color:#fff;border-radius:10px;padding:3px 9px;font-size:13px}
+.qzp.me{background:rgba(245,197,66,.35);font-weight:700}
+
+/* preferans */
+.g-pref .card.chosen{transform:translateY(-14px);box-shadow:0 0 0 3px #f5c542,0 2px 6px rgba(0,0,0,.35)}
+#prBtns{flex-wrap:wrap;gap:6px}
+#prBtns button{padding:8px 10px;min-width:48px;font-size:15px}
+#prBtns button:disabled{opacity:.35}
+#prInfo{flex-direction:column;align-items:center;gap:2px}
+
 /* nardy */
 .ndboard{width:min(96vw,460px);margin:4px auto;background:#6b4423;border:4px solid #3e2612;border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 .ndrow{display:grid;grid-template-columns:repeat(12,1fr);gap:2px;height:min(36vw,170px,22vh)}
@@ -466,35 +521,44 @@ body[data-table="ocean"]{--felt:#13807d;--felt2:#073838}
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=41",
-  "./js/host.js": "./js/host.js?v=41",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=41",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=41",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=41",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=41",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=41",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=41",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=41",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=41",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=41",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=41",
-  "./js/spy-data.js": "./js/spy-data.js?v=41",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=41",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=41",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=41",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=41",
-  "./js/svara-engine.js": "./js/svara-engine.js?v=41",
-  "./js/svara-ui.js": "./js/svara-ui.js?v=41",
-  "./js/checkers-engine.js": "./js/checkers-engine.js?v=41",
-  "./js/checkers-ui.js": "./js/checkers-ui.js?v=41",
-  "./js/nardy-engine.js": "./js/nardy-engine.js?v=41",
-  "./js/nardy-ui.js": "./js/nardy-ui.js?v=41",
-  "./js/dice-engine.js": "./js/dice-engine.js?v=41",
-  "./js/dice-ui.js": "./js/dice-ui.js?v=41",
-  "./js/shop.js": "./js/shop.js?v=41",
-  "./js/level.js": "./js/level.js?v=41"
+  "./js/common.js": "./js/common.js?v=42",
+  "./js/host.js": "./js/host.js?v=42",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=42",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=42",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=42",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=42",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=42",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=42",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=42",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=42",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=42",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=42",
+  "./js/spy-data.js": "./js/spy-data.js?v=42",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=42",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=42",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=42",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=42",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=42",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=42",
+  "./js/checkers-engine.js": "./js/checkers-engine.js?v=42",
+  "./js/checkers-ui.js": "./js/checkers-ui.js?v=42",
+  "./js/nardy-engine.js": "./js/nardy-engine.js?v=42",
+  "./js/nardy-ui.js": "./js/nardy-ui.js?v=42",
+  "./js/dice-engine.js": "./js/dice-engine.js?v=42",
+  "./js/dice-ui.js": "./js/dice-ui.js?v=42",
+  "./js/shop.js": "./js/shop.js?v=42",
+  "./js/level.js": "./js/level.js?v=42",
+  "./js/pref-engine.js": "./js/pref-engine.js?v=42",
+  "./js/pref-ui.js": "./js/pref-ui.js?v=42",
+  "./js/quiz-engine.js": "./js/quiz-engine.js?v=42",
+  "./js/quiz-data.js": "./js/quiz-data.js?v=42",
+  "./js/quiz-ui.js": "./js/quiz-ui.js?v=42",
+  "./js/klondike-engine.js": "./js/klondike-engine.js?v=42",
+  "./js/klondike-ui.js": "./js/klondike-ui.js?v=42",
+  "./js/chess-engine.js": "./js/chess-engine.js?v=42",
+  "./js/chess-ui.js": "./js/chess-ui.js?v=42"
 } }
 </script>
-<script type="module" src="js/app.js?v=41"></script>
+<script type="module" src="js/app.js?v=42"></script>
 </body>
 </html>

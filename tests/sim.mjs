@@ -6,6 +6,7 @@ import * as thousand from '../js/thousand-engine.js';
 import * as spy from '../js/spy-engine.js';
 import * as goat from '../js/goat-engine.js';
 import * as rpoker from '../js/rpoker-engine.js';
+import * as svara from '../js/svara-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -131,6 +132,30 @@ for (let n = 5; n <= 12; n++) {
     };
     const r = run(rpoker, { deck, length }, n, 30, check);
     console.log(`rpoker ${deck} ${length} n=${n}: ${deals / r.games} deals/game, exact bids ${Math.round(100 * exact / bids)}%`);
+  }
+}
+{
+  // scores
+  const C = (r, s) => ({ r, s, id: s * 9 + r });
+  const cases = [[[C(0,0),C(0,2),C(0,3)],34],[[C(8,0),C(8,2),C(8,3)],33],[[C(8,0),C(8,2),C(0,3)],22],[[C(8,0),C(7,0),C(4,0)],31],
+    [[C(1,1),C(8,0),C(7,0)],32],[[C(1,1),C(0,0),C(0,2)],34],[[C(1,1),C(3,2),C(2,3)],20],[[C(4,0),C(4,2),C(4,3)],30],[[C(0,0),C(1,0),C(2,2)],13]];
+  for (const [h, want] of cases) if (svara.score(h) !== want) throw new Error(`svara score ${JSON.stringify(h)} = ${svara.score(h)}, want ${want}`);
+  for (const length of ['short', 'full']) for (const n of [2, 3, 5, 8]) {
+    let hands = 0, svaras = 0, shows = 0, folds = 0, maxPot = 0;
+    const check = G => {
+      const total = G.chips.reduce((a, b) => a + b, 0) + G.pot;
+      if (total !== svara.START * n) throw new Error('svara chips ' + total);
+      if (G.chips.some(c => c < 0)) throw new Error('svara negative chips');
+      const ids = new Set(G.hands.flat().map(c => c.id));
+      if (ids.size !== G.hands.flat().length) throw new Error('svara duplicate card');
+      if (G.phase === 'show' && G.result && !G.result.__seen) {
+        G.result.__seen = true; hands++;
+        if (G.result.svara) svaras++; else if (G.result.shown.length) shows++; else folds++;
+        maxPot = Math.max(maxPot, G.result.pot);
+      }
+    };
+    const r = run(svara, { length }, n, 40, check);
+    console.log(`svara ${length} n=${n}: ${(hands / r.games).toFixed(1)} hands/game, show ${shows} fold ${folds} svara ${svaras}, max pot ${maxPot}`, 'winners', r.outcomes);
   }
 }
 console.log('OK');

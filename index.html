@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Ігри UA — Дурень, Покер, Тисяча, Мафія</title>
-<meta name="description" content="Дурень, Розписний покер, Тисяча, Козел, Мафія, Шпигун і Морський бій з друзями або ботами прямо в Telegram — @IgryUA_bot.">
+<meta name="description" content="Дурень, Розписний покер, Свара, Тисяча, Козел, Мафія, Шпигун і Морський бій з друзями або ботами прямо в Telegram — @IgryUA_bot.">
 <link rel="canonical" href="https://www.igryua.biz.ua/igry/">
 <meta property="og:title" content="Ігри UA — Дурень, Покер, Тисяча, Мафія у Telegram">
 <meta property="og:description" content="Карткові й компанійські ігри з друзями прямо в Telegram.">
@@ -54,7 +54,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 32;
+  var PAGE_VERSION = 33;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -259,6 +259,20 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
 #pBtns button{padding:8px 0;min-width:40px;font-size:16px}
 #pBtns button:disabled{opacity:.35}
 
+/* svara */
+#sInfo{flex-direction:column;align-items:center;gap:2px}
+#sBtns{flex-wrap:wrap;gap:6px}
+#sBtns button{padding:8px 12px;font-size:16px}
+#sBtns button.up{background:#b8860b}
+#sBtns button:disabled{opacity:.35}
+.spot{font-size:30px;font-weight:800;color:var(--gold);text-align:center;text-shadow:0 2px 6px rgba(0,0,0,.4)}
+.sres{font-size:17px;font-weight:700;color:#fff;text-align:center;padding:10px 14px;background:rgba(0,0,0,.25);border-radius:12px}
+.opp.sfold{opacity:.5}
+.opp.swin{box-shadow:0 0 0 2px var(--gold)}
+.opp .cn .scard{display:inline-block;background:#fffdf7;color:#111;border-radius:5px;padding:1px 4px;margin:0 1px;font-weight:700;font-size:13px}
+.opp .cn .scard.red{color:#c62828}
+.opp .cn .scard.jk{background:var(--gold)}
+
 /* thousand */
 .tscore{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:4px 10px 0}
 .tsc.me{color:#fff;font-weight:600}
@@ -355,25 +369,27 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=32",
-  "./js/host.js": "./js/host.js?v=32",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=32",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=32",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=32",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=32",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=32",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=32",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=32",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=32",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=32",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=32",
-  "./js/spy-data.js": "./js/spy-data.js?v=32",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=32",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=32",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=32",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=32"
+  "./js/common.js": "./js/common.js?v=33",
+  "./js/host.js": "./js/host.js?v=33",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=33",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=33",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=33",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=33",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=33",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=33",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=33",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=33",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=33",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=33",
+  "./js/spy-data.js": "./js/spy-data.js?v=33",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=33",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=33",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=33",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=33",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=33",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=33"
 } }
 </script>
-<script type="module" src="js/app.js?v=32"></script>
+<script type="module" src="js/app.js?v=33"></script>
 </body>
 </html>

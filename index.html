@@ -35,6 +35,13 @@
       d.innerHTML =
         '<div class="gbox"><div class="glogo">🎲</div><h2>Ігри UA</h2>' +
         '<p>Ігри працюють у Telegram — з вашим рейтингом, бонусами й друзями.</p>' +
+        '<ul class="gbonus">' +
+        '<li>🎁 <b>+10 очок</b> за перший вхід</li>' +
+        '<li>📅 <b>Бонус дня</b> — до +7 щодня поспіль</li>' +
+        '<li>👥 <b>+15</b> за кожного друга, а другові <b>+5</b></li>' +
+        '<li>🏆 Рейтинг, рівні й досягнення</li>' +
+        '<li>🎨 Нові сорочки карт і столи за рівні</li>' +
+        '</ul>' +
         '<a class="gbtn" href="' + tgApp + '">📱 Відкрити в Telegram</a>' +
         '<a class="gbtn alt" href="' + tgWeb + '" target="_blank" rel="noopener">🌐 Немає Telegram на цьому пристрої</a>' +
         '<a class="glink" href="?web=1' + (room ? '&room=' + room : '') + '">Грати тут, у браузері (як гість)</a></div>';
@@ -47,7 +54,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 31;
+  var PAGE_VERSION = 32;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -314,13 +321,16 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
 .hubact.gift{background:linear-gradient(90deg,#c0392b,#e67e22);animation:glow 1.6s ease-in-out infinite alternate}
 @keyframes glow{to{filter:brightness(1.25)}}
 .rules{max-height:55vh;overflow:auto;text-align:left}
-#tgGate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,#21603e 0%,#143a27 85%);color:#fff}
+#tgGate{position:fixed;inset:0;z-index:9999;overflow:auto;display:flex;align-items:safe center;justify-content:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,#21603e 0%,#143a27 85%);color:#fff}
 #tgGate .gbox{max-width:360px;width:100%;text-align:center;background:rgba(0,0,0,.25);border-radius:18px;padding:24px 18px}
 #tgGate .glogo{font-size:48px}
 #tgGate h2{margin:6px 0 8px}
 #tgGate p{margin:0 0 18px;color:rgba(255,255,255,.8);line-height:1.45}
 #tgGate .gbtn{display:block;margin:10px 0;padding:14px;border-radius:12px;background:#2f6fd6;color:#fff;text-decoration:none;font-weight:700}
 #tgGate .gbtn.alt{background:rgba(255,255,255,.14)}
+#tgGate .gbonus{list-style:none;margin:0 0 16px;padding:12px 14px;text-align:left;background:rgba(255,255,255,.08);border-radius:12px;font-size:15px;line-height:1.4}
+#tgGate .gbonus li{margin:5px 0}
+#tgGate .gbonus b{color:#f5c542}
 #tgGate .glink{display:inline-block;margin-top:12px;color:rgba(255,255,255,.75);font-size:14px}
 </style>
 </head>
@@ -345,25 +355,25 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=31",
-  "./js/host.js": "./js/host.js?v=31",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=31",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=31",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=31",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=31",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=31",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=31",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=31",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=31",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=31",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=31",
-  "./js/spy-data.js": "./js/spy-data.js?v=31",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=31",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=31",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=31",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=31"
+  "./js/common.js": "./js/common.js?v=32",
+  "./js/host.js": "./js/host.js?v=32",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=32",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=32",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=32",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=32",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=32",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=32",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=32",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=32",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=32",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=32",
+  "./js/spy-data.js": "./js/spy-data.js?v=32",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=32",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=32",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=32",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=32"
 } }
 </script>
-<script type="module" src="js/app.js?v=31"></script>
+<script type="module" src="js/app.js?v=32"></script>
 </body>
 </html>

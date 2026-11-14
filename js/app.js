@@ -68,7 +68,7 @@ GAMES.svara = { title: 'Свара', icon: '🎴', sub: '2–8 гравців', 
 GAMES.checkers = { title: 'Шашки', icon: '⚪', sub: '2 гравці', E: checkersE, UI: checkersUI, minP: 2, maxP: 2 };
 GAMES.nardy = { title: 'Нарди', icon: '🎲', sub: '2 гравці, довгі', E: nardyE, UI: nardyUI, minP: 2, maxP: 2 };
 GAMES.dice = { title: 'Кості', icon: '⚀', sub: '2–6 гравців, покер на костях', E: diceE, UI: diceUI, minP: 2, maxP: 6, defP: 3 };
-const SOON = [];
+const SOON = [['♟', 'Шахи'], ['🂠', 'Косинка'], ['❓', 'Вікторина'], ['🎩', 'Преферанс']];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 

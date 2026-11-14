@@ -1026,12 +1026,14 @@ async function shareCard({ text, url, button }) {
     body.appendChild(box);
     showPanel({ kind: 'share', icon: '📨', title: 'Надіслати другу', text: 'Текст із посиланням уже скопійовано — вставте його в чат із другом (Ctrl+V).', body, buttons: [
       { text: '📋 Скопіювати ще раз', fn: copy },
-      { text: '📤 Відкрити вікно «Поділитися»', sec: true, fn: () => { if (inTelegram && tg.openLink) tg.openLink(shareUrl); else window.open(shareUrl, '_blank'); } },
+      { text: '🌐 Надіслати через браузер', sec: true, fn: () => { if (inTelegram && tg.openLink) tg.openLink(shareUrl); else window.open(shareUrl, '_blank'); } },
       { text: 'Готово', sec: true, fn: back }] });
   };
-  // the card works reliably in the phone apps; desktop and web Telegram get the plain share window
+  // Picture cards (tg.shareMessage) did not open on the user's phone (2026-11-14), so they are off:
+  // phones get Telegram's own share window, computers the copy window. Set CARDS = true to try again.
+  const CARDS = false;
   const phone = inTelegram && ['android', 'ios'].includes(tg.platform);
-  if (!phone || !tg.shareMessage || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return fallback();
+  if (!CARDS || !phone || !tg.shareMessage || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return fallback();
   toast('Відкриваю…');
   try {
     const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 6000);

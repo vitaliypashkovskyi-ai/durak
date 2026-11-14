@@ -1011,23 +1011,30 @@ function shareInvite() {
 // otherwise the usual «share a link» window.
 async function shareCard({ text, url, button }) {
   const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+  // One window for every device (Telegram on some phones and on computers ignores share links
+  // from a mini app): the text is copied at once, plus every way to send it that the device has.
   const fallback = () => {
-    // phones: Telegram's own share window
-    if (inTelegram && ['android', 'ios'].includes(tg.platform) && tg.openTelegramLink) return tg.openTelegramLink(shareUrl);
-    // computer / web: Telegram there does not open share links from a mini app — copy the text
-    // with the link at once and offer the share page in the browser
     const all = text + '\n' + url;
-    const copy = () => { try { navigator.clipboard.writeText(all).then(() => toast('Скопійовано — вставте другу в чат (Ctrl+V)'), () => toast('Виділіть і скопіюйте посилання вручну')); } catch (e) { toast('Виділіть і скопіюйте посилання вручну'); } };
-    copy();
+    const phone = inTelegram && ['android', 'ios'].includes(tg.platform);
+    const copied = () => toast(phone ? 'Скопійовано — вставте другу в чат' : 'Скопійовано — вставте другу в чат (Ctrl+V)');
+    const copy = () => {
+      const manual = () => { box.focus(); box.select(); toast('Утримуйте текст і натисніть «Копіювати»'); };
+      try { navigator.clipboard.writeText(all).then(copied, () => { try { box.select(); if (document.execCommand('copy')) copied(); else manual(); } catch (e) { manual(); } }); }
+      catch (e) { manual(); }
+    };
     const back = panelKind() === 'lobby' && S && S.lobby ? () => showLobby(S.lobby) : hidePanel;
     const body = document.createElement('div');
     const box = document.createElement('textarea'); box.className = 'sharebox'; box.readOnly = true; box.value = all;
     box.onclick = () => box.select();
     body.appendChild(box);
-    showPanel({ kind: 'share', icon: '📨', title: 'Надіслати другу', text: 'Текст із посиланням уже скопійовано — вставте його в чат із другом (Ctrl+V).', body, buttons: [
-      { text: '📋 Скопіювати ще раз', fn: copy },
-      { text: '🌐 Надіслати через браузер', sec: true, fn: () => { if (inTelegram && tg.openLink) tg.openLink(shareUrl); else window.open(shareUrl, '_blank'); } },
-      { text: 'Готово', sec: true, fn: back }] });
+    const buttons = [];
+    if (navigator.share) buttons.push({ text: '📤 Поділитися…', fn: () => navigator.share({ text: all }).catch(() => {}) });
+    buttons.push({ text: '📋 Скопіювати', fn: copy });
+    if (inTelegram) buttons.push({ text: '✈️ Надіслати в Telegram', sec: true, fn: () => { try { if (phone && tg.openTelegramLink) tg.openTelegramLink(shareUrl); else tg.openLink(shareUrl); } catch (e) { window.open(shareUrl, '_blank'); } } });
+    else buttons.push({ text: '✈️ Надіслати в Telegram', sec: true, fn: () => window.open(shareUrl, '_blank') });
+    buttons.push({ text: 'Готово', sec: true, fn: back });
+    showPanel({ kind: 'share', icon: '📨', title: 'Надіслати другу', text: 'Текст із посиланням уже скопійовано — вставте його в чат із другом. Або оберіть спосіб нижче.', body, buttons });
+    setTimeout(copy, 50);
   };
   // Picture cards (tg.shareMessage) did not open on the user's phone (2026-11-14), so they are off:
   // phones get Telegram's own share window, computers the copy window. Set CARDS = true to try again.

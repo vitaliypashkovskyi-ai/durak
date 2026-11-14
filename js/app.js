@@ -1014,9 +1014,10 @@ async function shareCard({ text, url, button }) {
   // Telegram's own share window, exactly as before 2026-11-14 (the user asked to remove the extra window)
   const fallback = () => {
     if (!inTelegram) return window.open(shareUrl, '_blank');
-    // phones: Telegram's share window works
-    if (['android', 'ios'].includes(tg.platform) && tg.openTelegramLink) return tg.openTelegramLink(shareUrl);
-    // Telegram on a computer ignores share links from a mini app: copy the invitation instead
+    // Telegram's share window (works on phones, whatever the platform is called there)
+    try { if (tg.openTelegramLink) tg.openTelegramLink(shareUrl); } catch (e) {}
+    // Telegram on a computer / web ignores it: copy the invitation as well
+    if (!['tdesktop', 'macos', 'weba', 'webk', 'web', 'unigram'].includes(tg.platform)) return;
     const all = text + '\n' + url;
     const ok = () => toast('Скопійовано — вставте другу в чат (Ctrl+V)');
     const fail = () => { try { prompt('Скопіюйте й надішліть другу:', all); } catch (e) {} };

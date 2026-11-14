@@ -6,7 +6,7 @@ const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w', checkers: 'checkers_w', nardy: 'nardy_w', dice: 'dice_w' };
 const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
   'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3', 'checkers_w', 'nardy_w', 'dice_w',
-  'last_seen', 'pm_ok', 'mute', 'reminded_day'];
+  'last_seen', 'pm_ok', 'mute', 'reminded_day', 'first_seen', 'vip_until'];
 const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
@@ -82,6 +82,7 @@ export class Stats {
     this.sql.exec('CREATE TABLE IF NOT EXISTS results(id TEXT, game TEXT, res TEXT, pts INTEGER, ts INTEGER)');
     this.sql.exec('CREATE INDEX IF NOT EXISTS results_ts ON results(ts)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS purchases(id TEXT, item TEXT, stars INTEGER, charge TEXT PRIMARY KEY, ts INTEGER)');
     this.seen = new Map();   // who has the app open now (in memory): id -> last ping
   }
 
@@ -97,6 +98,9 @@ export class Stats {
     if (url.pathname === '/weekly') return json(await this.weekly());
     if (url.pathname === '/tour') return json(this.tour(url.searchParams.get('id')));
     if (url.pathname === '/ping') return json(this.ping(body.id));
+    if (url.pathname === '/event') { this.count(`${body.t}:${body.game}`); return json({ ok: true }); }
+    if (url.pathname === '/admin') return json(this.admin());
+    if (url.pathname === '/buy') return json(this.buy(body));
     if (url.pathname === '/notify') return json(this.notify(body));
     if (url.pathname === '/remind') return json(await this.remind());
     return new Response('not found', { status: 404 });
@@ -131,7 +135,9 @@ export class Stats {
     const streak = p.last_day >= today - 1 ? p.streak : 0;
     // next = what the next claim gives (today if not claimed yet, otherwise tomorrow)
     const daily = { available: p.last_day !== today, streak, next: dailyBonus(p.last_day === today || p.last_day === today - 1 ? p.streak + 1 : 1) };
-    return { ...p, rank, week, level: level(p.points), badges: badges(p), achievements: achievements(p), daily };
+    const owned = this.sql.exec("SELECT DISTINCT item FROM purchases WHERE id = ? AND item != 'vip'", String(id)).toArray().map(r => r.item);
+    const vip = (p.vip_until || 0) > Date.now();
+    return { ...p, rank, week, level: level(p.points), badges: badges(p), achievements: achievements(p), daily, owned, vip, vip_until: p.vip_until || 0 };
   }
 
   // First visit: +10 once. A brand-new player who came by a friend's link gets +5 more and the
@@ -140,7 +146,7 @@ export class Stats {
     if (!/^tg:\d+$/.test(String(id))) return { ok: false };
     const existed = this.sql.exec('SELECT welcome_done FROM players WHERE id = ?', id).toArray()[0];
     this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
-    this.sql.exec('UPDATE players SET last_seen = ?, pm_ok = MAX(pm_ok, ?) WHERE id = ?', Date.now(), pm ? 1 : 0, id);
+    this.sql.exec('UPDATE players SET last_seen = ?, pm_ok = MAX(pm_ok, ?), first_seen = CASE WHEN first_seen = 0 THEN ? ELSE first_seen END WHERE id = ?', Date.now(), pm ? 1 : 0, Date.now(), id);
     if (existed && existed.welcome_done) return { ok: true, welcome: false };
     this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
     let bonus = WELCOME, inviter = null;
@@ -173,6 +179,54 @@ export class Stats {
     this.sql.exec('UPDATE players SET points = points + ?, streak = ?, best_streak = MAX(best_streak, ?), last_day = ? WHERE id = ?',
       bonus, streak, streak, today, id);
     return { ok: true, claimed: true, bonus, streak, next: dailyBonus(streak + 1), points: p.points + bonus };
+  }
+
+  // ---------- counters per Kyiv day (kv 'c:<day>' = {key: n}) and the owner's summary ----------
+  count(key, n = 1) {
+    const k = 'c:' + kyivDay(), c = this.kvGet(k) || {};
+    c[key] = (c[key] || 0) + n;
+    this.kvSet(k, c);
+  }
+  admin() {
+    const now = Date.now(), today = kyivDay();
+    const one = (q, ...a) => this.sql.exec(q, ...a).one().n;
+    const [h, m, sec] = new Date(now).toLocaleTimeString('en-GB', { timeZone: 'Europe/Kyiv', hour12: false }).split(':').map(Number);
+    const dayStart = now - ((h % 24) * 3600 + m * 60 + sec) * 1000;   // Kyiv midnight
+    const sum = days => { const t = {}; for (let d = today - days + 1; d <= today; d++) { const c = this.kvGet('c:' + d) || {}; for (const k in c) t[k] = (t[k] || 0) + c[k]; } return t; };
+    const games = since => this.sql.exec('SELECT game, COUNT(DISTINCT ts) AS n FROM results WHERE ts > ? GROUP BY game ORDER BY n DESC', since).toArray();
+    return {
+      players: one('SELECT COUNT(*) AS n FROM players'),
+      newToday: one('SELECT COUNT(*) AS n FROM players WHERE first_seen > ?', dayStart),
+      new7: one('SELECT COUNT(*) AS n FROM players WHERE first_seen > ?', now - WEEK),
+      activeToday: one('SELECT COUNT(*) AS n FROM players WHERE last_seen > ?', dayStart),
+      active7: one('SELECT COUNT(*) AS n FROM players WHERE last_seen > ?', now - WEEK),
+      online: this.ping(null).online,
+      onlineToday: games(dayStart), online7: games(now - WEEK),
+      botToday: sum(1), bot7: sum(7),
+      reminders: { canWrite: one('SELECT COUNT(*) AS n FROM players WHERE pm_ok = 1 AND mute = 0'), muted: one('SELECT COUNT(*) AS n FROM players WHERE mute = 1'),
+        today: one('SELECT COUNT(*) AS n FROM players WHERE reminded_day = ?', today) },
+      refs7: one('SELECT COUNT(*) AS n FROM players WHERE ref_by != 0 AND first_seen > ?', now - WEEK),
+      stars: { today: one('SELECT COALESCE(SUM(stars), 0) AS n FROM purchases WHERE ts > ?', dayStart),
+        week: one('SELECT COALESCE(SUM(stars), 0) AS n FROM purchases WHERE ts > ?', now - WEEK),
+        all: one('SELECT COALESCE(SUM(stars), 0) AS n FROM purchases'), buyers: one('SELECT COUNT(DISTINCT id) AS n FROM purchases'),
+        vips: one('SELECT COUNT(*) AS n FROM players WHERE vip_until > ?', now) },
+    };
+  }
+
+  // ---------- Telegram Stars ----------
+  // {id, item, stars, charge}: a paid order (charge = Telegram's payment id, so a repeat is ignored)
+  buy({ id, item, stars, charge }) {
+    if (!/^tg:\d+$/.test(String(id)) || !item || !charge) return { ok: false };
+    if (this.sql.exec('SELECT COUNT(*) AS n FROM purchases WHERE charge = ?', charge).one().n) return { ok: true, repeat: true };
+    this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO NOTHING', id, 'Гравець');
+    this.sql.exec('INSERT INTO purchases(id, item, stars, charge, ts) VALUES(?, ?, ?, ?, ?)', id, item, stars | 0, charge, Date.now());
+    if (item === 'vip') {
+      const p = this.sql.exec('SELECT vip_until FROM players WHERE id = ?', id).one();
+      const until = Math.max(Date.now(), p.vip_until || 0) + 30 * 86400 * 1000;
+      this.sql.exec('UPDATE players SET vip_until = ? WHERE id = ?', until, id);
+      return { ok: true, vip_until: until };
+    }
+    return { ok: true };
   }
 
   // ---------- online counter ----------

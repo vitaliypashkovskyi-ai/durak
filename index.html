@@ -54,7 +54,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 36;
+  var PAGE_VERSION = 37;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -164,11 +164,22 @@ body[data-back="gold"] .back{background:
   repeating-linear-gradient(45deg,#b8860b 0 3px,#f5d76e 3px 7px),#f5d76e;
   box-shadow:inset 0 0 0 3px #fff4c7,inset 0 0 0 5px #8a6508,0 2px 6px rgba(0,0,0,.35)}
 body[data-back="gold"] .card.tiny.back{background:repeating-linear-gradient(45deg,#b8860b 0 2px,#f5d76e 2px 4px)}
+/* card backs for Stars */
+body[data-back="kozak"] .back{background:repeating-linear-gradient(135deg,#0b3d91 0 6px,#f5c542 6px 9px),#0b3d91;
+  box-shadow:inset 0 0 0 3px #fff4c7,inset 0 0 0 5px #0b3d91,0 2px 6px rgba(0,0,0,.35)}
+body[data-back="kozak"] .card.tiny.back{background:repeating-linear-gradient(135deg,#0b3d91 0 3px,#f5c542 3px 5px)}
+body[data-back="diamond"] .back{background:repeating-conic-gradient(#e3f2ff 0 25%,#6fa8ff 0 50%) 0 0/14px 14px;
+  box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 5px #2f6fd6,0 2px 6px rgba(0,0,0,.35)}
+body[data-back="diamond"] .card.tiny.back{background:repeating-conic-gradient(#e3f2ff 0 25%,#6fa8ff 0 50%) 0 0/8px 8px}
 /* tables */
 body[data-table="blue"]{--felt:#1f4f8a;--felt2:#11294a}
 body[data-table="wine"]{--felt:#7a2232;--felt2:#3a0e17}
 body[data-table="night"]{--felt:#2b2b30;--felt2:#0c0c0f;--gold:#f0c75e}
 body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2c22 0%,#0c0c0f 80%)}
+body[data-table="velvet"]{--felt:#5b3380;--felt2:#241334}
+body[data-table="ocean"]{--felt:#13807d;--felt2:#073838}
+.look.star small{color:#b8860b;font-weight:700}
+.chip.vipbtn{display:block;width:100%;margin:10px 0 4px;background:linear-gradient(90deg,#6a3fb5,#2f6fd6);color:#fff;font-weight:700}
 /* look panel */
 .looks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:6px 0 2px}
 .look{border:2px solid transparent;border-radius:12px;background:#f1ede2;padding:8px 6px;text-align:center;font:inherit;color:#1b1b1b;cursor:pointer}
@@ -266,6 +277,12 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
 
 .chip.notify{display:block;width:100%;margin:6px 0 2px;font-size:14px}
 #online{font-weight:600;color:#9be37f}
+
+.loginbox{background:rgba(0,0,0,.22);border-radius:12px;padding:10px;margin:0 0 8px;text-align:center;color:#fff;font-size:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.tipbar{background:rgba(255,253,247,.96);color:#1b1b1b;border-radius:12px;padding:8px 10px;margin:4px auto 6px;max-width:520px;font-size:14px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.tipbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
+.tipbtns button{border:0;border-radius:9px;padding:6px 12px;font-size:14px;font-weight:700;background:var(--blue);color:#fff;cursor:pointer}
+.tipbtns button.sec{background:#e6e1d4;color:#1b1b1b}
 
 /* checkers */
 .ckhead{text-align:center;color:#fff;font-size:14px;padding:4px 10px;border-radius:10px;opacity:.85;margin:2px auto}
@@ -438,33 +455,34 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=36",
-  "./js/host.js": "./js/host.js?v=36",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=36",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=36",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=36",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=36",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=36",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=36",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=36",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=36",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=36",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=36",
-  "./js/spy-data.js": "./js/spy-data.js?v=36",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=36",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=36",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=36",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=36",
-  "./js/svara-engine.js": "./js/svara-engine.js?v=36",
-  "./js/svara-ui.js": "./js/svara-ui.js?v=36",
-  "./js/checkers-engine.js": "./js/checkers-engine.js?v=36",
-  "./js/checkers-ui.js": "./js/checkers-ui.js?v=36",
-  "./js/nardy-engine.js": "./js/nardy-engine.js?v=36",
-  "./js/nardy-ui.js": "./js/nardy-ui.js?v=36",
-  "./js/dice-engine.js": "./js/dice-engine.js?v=36",
-  "./js/dice-ui.js": "./js/dice-ui.js?v=36"
+  "./js/common.js": "./js/common.js?v=37",
+  "./js/host.js": "./js/host.js?v=37",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=37",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=37",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=37",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=37",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=37",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=37",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=37",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=37",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=37",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=37",
+  "./js/spy-data.js": "./js/spy-data.js?v=37",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=37",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=37",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=37",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=37",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=37",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=37",
+  "./js/checkers-engine.js": "./js/checkers-engine.js?v=37",
+  "./js/checkers-ui.js": "./js/checkers-ui.js?v=37",
+  "./js/nardy-engine.js": "./js/nardy-engine.js?v=37",
+  "./js/nardy-ui.js": "./js/nardy-ui.js?v=37",
+  "./js/dice-engine.js": "./js/dice-engine.js?v=37",
+  "./js/dice-ui.js": "./js/dice-ui.js?v=37",
+  "./js/shop.js": "./js/shop.js?v=37"
 } }
 </script>
-<script type="module" src="js/app.js?v=36"></script>
+<script type="module" src="js/app.js?v=37"></script>
 </body>
 </html>

@@ -16,7 +16,7 @@ import * as checkers from '../../js/checkers-engine.js';
 import * as nardy from '../../js/nardy-engine.js';
 import * as dice from '../../js/dice-engine.js';
 import { Host } from '../../js/host.js';
-import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES } from './telegram.js';
+import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES, invoiceLink } from './telegram.js';
 export { Stats } from './stats.js';
 
 const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice };
@@ -55,6 +55,18 @@ export default {
       return new Response('ok');
     }
     if (url.pathname === '/api/top') return json(await statsCall(env, '/top?period=' + (url.searchParams.get('period') === 'week' ? 'week' : 'all')));
+    if (url.pathname === '/api/shop' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
+      const link = await invoiceLink(env, user, String(body.item || ''));
+      return link ? json({ link }) : json({ error: 'no item' }, 400);
+    }
+    if (url.pathname === '/api/event' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      if (body.t === 'bot' && ENGINES[body.game]) ctx.waitUntil(statsCall(env, '/event', { t: 'bot', game: body.game }));
+      return json({ ok: true });
+    }
     if (url.pathname === '/api/ping' && req.method === 'POST') {
       // «🟢 N онлайн»: everyone with the app open pings once a minute
       const body = await req.json().catch(() => ({}));
@@ -134,8 +146,23 @@ async function hmac(key, data) {
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return crypto.subtle.sign('HMAC', k, enc.encode(data));
 }
+// Telegram Login Widget on the website: "tglogin:" + its fields as a query string.
+// Check: HMAC-SHA256(data_check_string, SHA256(bot token)); valid for 30 days.
+async function verifyLogin(qs, token) {
+  const p = new URLSearchParams(qs);
+  const hash = p.get('hash');
+  if (!hash) return null;
+  p.delete('hash');
+  const dcs = [...p.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${k}=${v}`).join('\n');
+  const secret = await crypto.subtle.digest('SHA-256', enc.encode(token));
+  if (hex(await hmac(secret, dcs)) !== hash) return null;
+  if (Date.now() / 1000 - Number(p.get('auth_date') || 0) > 30 * 86400) return null;
+  if (!p.get('id')) return null;
+  return { id: 'tg:' + p.get('id'), name: clean(p.get('first_name') || p.get('username')), pm: true, web: true };
+}
 async function verifyTelegram(init, token) {
   if (!init || !token) return null;
+  if (init.startsWith('tglogin:')) return verifyLogin(init.slice(8), token);
   const p = new URLSearchParams(init);
   const hash = p.get('hash');
   if (!hash) return null;
@@ -304,7 +331,7 @@ export class Room {
     if (s.lvl == null && s.id.startsWith('tg:')) {
       // the player's level (for the ⭐🏅👑 mark others see); looked up once per seat
       s.lvl = 0;
-      statsCall(this.env, '/profile', { id: s.id }).then(p => { s.lvl = (p.level && p.level.idx) || 0; if (s.lvl >= 3) this.broadcast(); }).catch(() => {});
+      statsCall(this.env, '/profile', { id: s.id }).then(p => { s.lvl = (p.level && p.level.idx) || 0; s.vip = !!p.vip; if (s.lvl >= 3 || s.vip) this.broadcast(); }).catch(() => {});
     }
     clearTimeout(this.timers.get(s.id));
     if (s.bot && this.G) {           // came back: take the seat back from the bot
@@ -437,7 +464,7 @@ export class Room {
       return {
         type: 'lobby', game: cfg.game, cfg, you: i,
         host: this.seats.findIndex(x => x.id === this.hostId),
-        seats: this.seats.map(x => ({ name: x.name, bot: x.botOnly, online: x.botOnly || !!x.ws, lvl: x.lvl || 0 })),
+        seats: this.seats.map(x => ({ name: x.name, bot: x.botOnly, online: x.botOnly || !!x.ws, lvl: x.lvl || 0, vip: !!x.vip })),
       };
     }
     const v = ENGINES[cfg.game].view(this.G, i);
@@ -446,6 +473,7 @@ export class Room {
     v.online = this.seats.map(x => x.botOnly || x.bot || !!x.ws);
     v.again = this.seats.map(x => this.again.has(x.id));
     v.levels = this.seats.map(x => x.lvl || 0);
+    v.vips = this.seats.map(x => !!x.vip);
     return v;
   }
   broadcast() { this.seats.forEach((s, i) => { if (s.ws) send(s.ws, this.view(i)); }); }

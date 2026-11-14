@@ -22,6 +22,7 @@ import * as nardyE from './nardy-engine.js';
 import * as nardyUI from './nardy-ui.js';
 import * as diceE from './dice-engine.js';
 import * as diceUI from './dice-ui.js';
+import { SHOP } from './shop.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -30,6 +31,28 @@ const PAGE_URL = 'https://www.igryua.biz.ua/';
 const COMMUNITY = 'https://t.me/UAIgry';                 // news channel
 const CHAT = 'https://t.me/ua_Igry';                     // players' chat (public group linked to the channel)
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
+
+// Who the player is: the Mini App's initData in Telegram, or the Telegram Login Widget on the website.
+let LOGIN = null;
+try { LOGIN = JSON.parse(localStorage.getItem('games.login')); } catch (e) {}
+if (LOGIN && (!LOGIN.id || Date.now() / 1000 - LOGIN.auth_date > 29 * 86400)) LOGIN = null;
+const signedIn = inTelegram || !!LOGIN;
+const AUTH = () => (inTelegram ? tg.initData : LOGIN ? 'tglogin:' + new URLSearchParams(Object.entries(LOGIN).map(([k, v]) => [k, String(v)])).toString() : '');
+window.onTelegramAuth = user => {
+  try { localStorage.setItem('games.login', JSON.stringify(user)); } catch (e) {}
+  location.reload();
+};
+function loginButton(box) {
+  const wrap = document.createElement('div'); wrap.className = 'loginbox';
+  const t = document.createElement('div'); t.textContent = '🔐 Увійдіть через Telegram — і тут будуть ваш рейтинг, бонуси й оформлення';
+  wrap.appendChild(t);
+  const sc = document.createElement('script');
+  sc.async = true; sc.src = 'https://telegram.org/js/telegram-widget.js?22';
+  sc.dataset.telegramLogin = 'IgryUA_bot'; sc.dataset.size = 'large'; sc.dataset.radius = '12';
+  sc.dataset.onauth = 'onTelegramAuth(user)'; sc.dataset.requestAccess = 'write';
+  wrap.appendChild(sc);
+  box.appendChild(wrap);
+}
 
 const GAMES = {
   durak: { title: 'Дурень', icon: '🃏', sub: '2–12 гравців', E: durakE, UI: durakUI, minP: 2, maxP: 12, variants: true },
@@ -56,12 +79,16 @@ const LOOKS = {
     ['vysh', 'Вишиванка', 0, 'repeating-linear-gradient(45deg,#fffdf7 0 4px,#b3201f 4px 6px)'],
     ['petr', 'Петриківка', 1, 'radial-gradient(circle,#e8541e 0 30%,transparent 32%) 0 0/12px 12px,#fff6e0'],
     ['gold', 'Золота', 4, 'repeating-linear-gradient(45deg,#b8860b 0 3px,#f5d76e 3px 7px)'],
+    ['kozak', 'Козацька', 0, 'repeating-linear-gradient(135deg,#0b3d91 0 5px,#f5c542 5px 8px)', 'kozak'],
+    ['diamond', 'Діамант', 0, 'repeating-conic-gradient(#e3f2ff 0 25%,#6fa8ff 0 50%) 0 0/10px 10px', 'diamond'],
   ],
   table: [
     ['green', 'Зелений', 0, 'radial-gradient(#21603e,#143a27)', '#143a27'],
     ['blue', 'Синій', 2, 'radial-gradient(#1f4f8a,#11294a)', '#11294a'],
     ['wine', 'Бордовий', 3, 'radial-gradient(#7a2232,#3a0e17)', '#3a0e17'],
     ['night', 'Нічний', 5, 'radial-gradient(#2f2c22,#0c0c0f)', '#0c0c0f'],
+    ['velvet', 'Оксамит', 0, 'radial-gradient(#5b3380,#241334)', '#241334', 'velvet'],
+    ['ocean', 'Океан', 0, 'radial-gradient(#13807d,#073838)', '#073838', 'ocean'],
   ],
 };
 function applyLook() {
@@ -77,14 +104,38 @@ applyLook();
 async function showLooks() {
   showPanel({ kind: 'looks', icon: '🎨', title: 'Оформлення', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
   let lvl = 0, points = 0;
-  if (inTelegram) {
+  SHOPPED = { owned: [], vip: false, vipUntil: 0 };
+  if (signedIn) {
     try {
-      const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) });
-      if (r.ok) { const me = await r.json(); lvl = me.level.idx || 0; points = me.points || 0; }
+      const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) });
+      if (r.ok) { const me = await r.json(); lvl = me.level.idx || 0; points = me.points || 0; SHOPPED = { owned: me.owned || [], vip: !!me.vip, vipUntil: me.vip_until || 0 }; }
     } catch (e) {}
   }
+  // a premium look that is no longer yours (VIP ended) goes back to the default
+  const cur = pref('look', {}), fixed = Object.assign({}, cur);
+  for (const key of ['back', 'table']) {
+    const x = LOOKS[key].find(l => l[0] === cur[key]);
+    if (x && starOf(key, x) && !ownsLook(starOf(key, x))) delete fixed[key];
+  }
+  if (JSON.stringify(fixed) !== JSON.stringify(cur)) { setPref('look', fixed); applyLook(); }
   if (panelKind() !== 'looks') return;
   drawLooks(lvl, points);
+}
+// ---------- Telegram Stars ----------
+let SHOPPED = { owned: [], vip: false, vipUntil: 0 };
+const starOf = (key, x) => (key === 'back' ? x[4] : x[5]);
+const ownsLook = item => SHOPPED.vip || SHOPPED.owned.includes(item);
+async function buy(item) {
+  if (!signedIn) return toast('Покупки — у Telegram (@IgryUA_bot)');
+  try {
+    const r = await (await fetch(`${httpBase()}/api/shop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), item }) })).json();
+    if (!r.link) return toast('Магазин зараз недоступний');
+    if (!inTelegram || !tg.openInvoice) { window.open(r.link, '_blank'); return toast('Оплата відкриється в Telegram'); }
+    tg.openInvoice(r.link, status => {
+      if (status === 'paid') { sfx('win'); haptic('success'); toast('Дякуємо! ⭐'); setTimeout(showLooks, 1500); }
+      else if (status === 'failed') toast('Оплата не пройшла');
+    });
+  } catch (e) { toast('Не вдалося відкрити оплату'); }
 }
 function drawLooks(lvl, points) {
   const cur = pref('look', {});
@@ -92,16 +143,19 @@ function drawLooks(lvl, points) {
   const section = (title, key) => {
     const l = document.createElement('div'); l.className = 'lbl'; l.textContent = title;
     const grid = document.createElement('div'); grid.className = 'looks';
-    LOOKS[key].forEach(([id, name, need, swatch]) => {
-      const open = lvl >= need, on = (cur[key] || LOOKS[key][0][0]) === id;
+    LOOKS[key].forEach(x => {
+      const [id, name, need, swatch] = x, star = starOf(key, x);
+      const open = star ? ownsLook(star) : lvl >= need, on = (cur[key] || LOOKS[key][0][0]) === id;
       const b = document.createElement('button');
       b.className = 'look' + (on ? ' on' : '') + (open ? '' : ' locked');
       const sw = document.createElement('span'); sw.className = 'sw' + (key === 'back' ? ' card' : ''); sw.style.background = swatch;
       const n = document.createElement('b'); n.textContent = name;
       const s = document.createElement('small');
-      s.textContent = !open ? `🔒 ${LEVEL_NAMES[need]} · ${LEVEL_AT[need]} оч.` : on ? '✓ обрано' : 'обрати';
+      s.textContent = !open ? (star ? `⭐ ${SHOP[star].price}` : `🔒 ${LEVEL_NAMES[need]} · ${LEVEL_AT[need]} оч.`) : on ? '✓ обрано' : 'обрати';
+      if (star && !open) b.classList.add('star');
       b.append(sw, n, s);
       b.onclick = () => {
+        if (!open && star) return buy(star);
         if (!open) return toast(`Відкриється на рівні «${LEVEL_NAMES[need]}»`);
         setPref('look', Object.assign({}, pref('look', {}), { [key]: id }));
         applyLook(); sfx('pop'); drawLooks(lvl, points);
@@ -112,13 +166,24 @@ function drawLooks(lvl, points) {
   };
   section('Сорочка карт', 'back');
   section('Стіл', 'table');
+  if (signedIn) {
+    const v = document.createElement('button');
+    v.className = 'chip vipbtn';
+    v.textContent = SHOPPED.vip
+      ? `💎 VIP до ${new Date(SHOPPED.vipUntil).toLocaleDateString('uk-UA')} · продовжити ⭐ ${SHOP.vip.price}`
+      : `💎 VIP на 30 днів — ⭐ ${SHOP.vip.price}: значок 💎 і всі преміум-оформлення`;
+    v.onclick = () => buy('vip');
+    body.appendChild(v);
+    const n = document.createElement('div'); n.className = 'lbl'; n.textContent = 'За ⭐ — лише оформлення, на гру це не впливає.';
+    body.appendChild(n);
+  }
   const m = document.createElement('p'); m.className = 'muted';
   m.textContent = 'Позначка біля імені, яку бачать суперники: ⭐ з рівня «Досвідчений», 🏅 «Майстер», 👑 «Легенда».';
   body.appendChild(m);
   const next = LEVEL_AT[lvl + 1];
   showPanel({
     kind: 'looks', icon: '🎨', title: 'Оформлення', body,
-    text: inTelegram ? `Ваш рівень: ${LEVEL_NAMES[lvl]} · ${points} оч.` + (next ? `\nДо наступного: ${next - points} оч. — грайте онлайн і забирайте 🎁 бонус дня` : '')
+    text: signedIn ? `Ваш рівень: ${LEVEL_NAMES[lvl]} · ${points} оч.` + (next ? `\nДо наступного: ${next - points} оч. — грайте онлайн і забирайте 🎁 бонус дня` : '')
       : 'Нові сорочки й столи відкриваються з рівнем — грайте в Telegram (@IgryUA_bot).',
     buttons: [{ text: 'Готово', fn: hidePanel }],
   });
@@ -168,6 +233,7 @@ function showHub() {
   h.innerHTML = '<div class="hubtop"></div><div class="hubhead">Оберіть гру <span id="online"></span></div><div class="hubgrid"></div>';
   showOnline();
   const top = h.querySelector('.hubtop');
+  if (!signedIn) loginButton(top);
   const last = pref('lastRoom', null);
   if (last && Date.now() - last.t < 6 * 3600 * 1000) {
     const b = document.createElement('button');
@@ -221,7 +287,7 @@ function showHub() {
   rateBtn.onclick = () => showRating('week');
   const giftBtn = document.createElement('button');
   const claimedToday = pref('dailyDay', '') === new Date().toLocaleDateString('en-CA');
-  giftBtn.className = 'hubact' + (inTelegram && !claimedToday ? ' gift' : '');
+  giftBtn.className = 'hubact' + (signedIn && !claimedToday ? ' gift' : '');
   giftBtn.textContent = '🎁 Бонус дня';
   giftBtn.onclick = claimDaily;
   row2.append(rateBtn, giftBtn);
@@ -274,7 +340,37 @@ function openGame(game) {
   $('game').className = 'g-' + game;
   updStats(game);
   g.UI.mount($('game'), api);
+  showTip(game);
   if (tg && tg.BackButton) tg.BackButton.show();
+}
+
+// ---------- first-game tips: a short «how to play» strip, shown until the player closes it ----------
+const TIPS = {
+  durak: 'Торкніться карти, щоб походити або відбитися. Кнопки «Беру» й «Бито» — під столом. Хто лишився з картами — дурень 🙃',
+  rpoker: 'Спершу замовте, скільки взяток візьмете (кнопки з числами), потім грайте так, щоб узяти рівно стільки. Джокер 🃏 — найсильніший.',
+  svara: 'У вас 3 карти й очки вгорі. «Пас» — скинути, «Підтримати» — зрівняти ставку, «+1…+10» — підняти. Блефуйте сміливо 😎',
+  thousand: 'Спершу торг: хто назве більше — бере прикуп. Марьяж (король + дама однієї масті) дає очки й робить масть козирем.',
+  goat: 'Ваш партнер сидить навпроти. Масть треба підтримати; вальти й трефи — козирі. Віддавайте партнерові «товсті» карти, коли взятка його.',
+  mafia: 'Вночі мафія обирає жертву, лікар рятує, комісар перевіряє. Вдень обговорюйте в чаті й голосуйте, кого вигнати.',
+  spy: 'Ставте питання про локацію іншим гравцям. Хто відповідає дивно — може бути шпигуном! Шпигун вгадує локацію зі списку.',
+  battle: 'Натисніть «Перемішати», поки розстановка не сподобається, потім «Готово». Влучили — стріляйте ще раз.',
+  checkers: 'Торкніться своєї шашки (підсвічені — можуть ходити), потім клітинки з зеленою крапкою. Бити обов\'язково!',
+  nardy: 'Кубики кидаються самі. Торкніться своєї шашки, потім підсвіченого пункту. Ваші шашки йдуть знизу справа наліво, потім угорі до дому.',
+  dice: 'Киньте кубики, торкніться тих, які хочете залишити, і перекиньте решту (до 3 разів). Потім оберіть рядок у таблиці.',
+};
+function showTip(game) {
+  const t = TIPS[game];
+  if (!t || pref('tip.' + game, false)) return;
+  const d = document.createElement('div');
+  d.className = 'tipbar';
+  const txt = document.createElement('span'); txt.textContent = '💡 ' + t;
+  const more = document.createElement('button'); more.className = 'sec'; more.textContent = 'Правила';
+  more.onclick = () => showRules(game);
+  const ok = document.createElement('button'); ok.textContent = 'Зрозуміло';
+  ok.onclick = () => { setPref('tip.' + game, true); d.remove(); };
+  const btns = document.createElement('div'); btns.className = 'tipbtns'; btns.append(more, ok);
+  d.append(txt, btns);
+  $('game').prepend(d);
 }
 
 function showRules(game, back) {
@@ -339,7 +435,7 @@ function showSetup(game) {
 
 // ---------- games with bots ----------
 function myName() {
-  const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  const u = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || LOGIN;
   return (u && u.first_name) || 'Ви';
 }
 function startLocal(game, cfg, n, force) {
@@ -375,7 +471,7 @@ function runLocal(game, cfg, n, G) {
     },
   });
   S = { kind: 'local', game, cfg, n, host, act: m => host.act(0, m) };
-  levels.list = null;
+  levels.list = null; levels.vip = null;
   api.online = null;
   openGame(game);
   host.changed();
@@ -438,6 +534,7 @@ function showResult(v) {
   const buttons = [];
   if (S.kind === 'local') {
     const { game, cfg, n } = S;
+    if (!S.counted) { S.counted = true; fetch(`${httpBase()}/api/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: 'bot', game }) }).catch(() => {}); }
     buttons.push({ text: 'Ще раз', fn: () => startLocal(game, cfg, n) });
   } else {
     const me = v.seat, mine = v.again && v.again[me];
@@ -458,13 +555,13 @@ const httpBase = () => serverBase().replace(/^ws/, 'http');
 
 // ---------- daily bonus ----------
 async function claimDaily() {
-  if (!inTelegram) {
+  if (!signedIn) {
     return showPanel({ kind: 'daily', icon: '🎁', title: 'Бонус дня', text: 'Щоденний бонус — для гравців у Telegram. Відкрийте гру в @IgryUA_bot.', buttons: [{ text: 'Зрозуміло', sec: true, fn: hidePanel }] });
   }
   showPanel({ kind: 'daily', icon: '🎁', title: 'Бонус дня', text: 'Відкриваємо…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
   let r;
   try {
-    r = await (await fetch(`${httpBase()}/api/daily`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) })).json();
+    r = await (await fetch(`${httpBase()}/api/daily`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) })).json();
   } catch (e) { r = null; }
   if (!r || !r.ok) return showPanel({ kind: 'daily', icon: '🎁', title: 'Бонус дня', text: 'Не вдалося. Спробуйте пізніше.', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
   setPref('dailyDay', new Date().toLocaleDateString('en-CA'));
@@ -485,11 +582,11 @@ async function showRating(period) {
   let top = [], me = null, tour = null;
   try {
     if (period === 'week') {
-      tour = await (await fetch(`${httpBase()}/api/tour`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: inTelegram ? tg.initData : '' }) })).json();
+      tour = await (await fetch(`${httpBase()}/api/tour`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) })).json();
       top = tour.top;
     } else top = await (await fetch(`${httpBase()}/api/top?period=${period}`)).json();
-    if (inTelegram) {
-      const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) });
+    if (signedIn) {
+      const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH() }) });
       if (r.ok) me = await r.json();
     }
   } catch (e) {
@@ -523,7 +620,7 @@ async function showRating(period) {
       });
       body.append(l, grid);
     }
-  } else if (!inTelegram) {
+  } else if (!signedIn) {
     add('p', 'muted', 'Свої очки побачите, коли відкриєте гру в Telegram (@IgryUA_bot).');
   }
   const tabs = document.createElement('div'); tabs.className = 'chips';
@@ -551,12 +648,12 @@ function notifySwitch(on) {
   const b = document.createElement('button');
   b.className = 'chip notify' + (on ? ' on' : '');
   b.textContent = on ? '🔔 Нагадування від бота: увімкнено' : '🔕 Нагадування від бота: вимкнено';
-  const save = want => fetch(`${httpBase()}/api/notify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData, on: want }) })
+  const save = want => fetch(`${httpBase()}/api/notify`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), on: want }) })
     .then(r => r.json()).then(r => { b.replaceWith(notifySwitch(!!(r.on && r.pm))); toast(r.on ? '🔔 Бот нагадає про бонус дня й турнір' : '🔕 Нагадування вимкнено'); })
     .catch(() => toast('Не вдалося зберегти'));
   b.onclick = () => {
     if (on) return save(false);
-    if (tg && tg.requestWriteAccess) {
+    if (inTelegram && tg.requestWriteAccess) {
       try { tg.requestWriteAccess(ok => { if (ok) save(true); else toast('Без дозволу бот не зможе написати'); }); return; } catch (e) {}
     }
     save(true);
@@ -573,7 +670,7 @@ function showOnline() {
 async function pingOnline() {
   if (document.hidden) return;
   try {
-    const body = inTelegram ? { init: tg.initData } : { gid: (hello().guest || {}).id };
+    const body = signedIn ? { init: AUTH() } : { gid: (hello().guest || {}).id };
     const r = await (await fetch(`${httpBase()}/api/ping`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
     ONLINE = r.online || 0;
     showOnline();
@@ -594,7 +691,7 @@ function tourBox(t) {
   if (endsAt) line(`Підсумки: ${endsAt} (за Києвом)`, 'sub');
   line(`🎁 Призи: 🥇 +${t.prizes[0]} · 🥈 +${t.prizes[1]} · 🥉 +${t.prizes[2]} очок і кубок`);
   if (t.me) line(`Ваше місце: ${t.me.place} · ${t.me.points} оч.` + (t.me.place <= 3 ? ' — ви в призах! 🔥' : ''), 'tme');
-  else if (inTelegram) line('Зіграйте онлайн з друзями — і ви в турнірі!', 'sub');
+  else if (signedIn) line('Зіграйте онлайн з друзями — і ви в турнірі!', 'sub');
   if (t.last && t.last.winners && t.last.winners.length) {
     line('Минулого тижня: ' + t.last.winners.map(w => `${['🥇', '🥈', '🥉'][w.place - 1]} ${w.name}`).join('  '), 'sub');
   }
@@ -602,7 +699,7 @@ function tourBox(t) {
 }
 
 function hello(extra) {
-  if (inTelegram) return Object.assign({ t: 'hello', init: tg.initData }, extra);
+  if (signedIn) return Object.assign({ t: 'hello', init: AUTH() }, extra);
   if (!GID) {
     try { GID = sessionStorage.getItem('games.gid'); } catch (e) {}
     if (!GID) {
@@ -663,6 +760,7 @@ function onRoomMsg(m) {
   if (['lobby', 'connect'].includes(panelKind())) hidePanel();
   api.online = m.online;
   levels.list = m.levels || null;
+  levels.vip = m.vips || null;
   onView(m);
 }
 
@@ -676,7 +774,7 @@ function showLobby(m) {
   const ul = document.createElement('ul'); ul.className = 'plist';
   m.seats.forEach((s, i) => {
     const li = document.createElement('li');
-    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${LVL_MARK[s.lvl] ? ' ' + LVL_MARK[s.lvl] : ''}${i === me ? ' (ви)' : ''}${i === m.host ? ' (ведучий)' : ''}${s.online ? '' : ' 📴'}`;
+    li.textContent = `${s.bot ? '🤖 ' : '👤 '}${s.name}${LVL_MARK[s.lvl] ? ' ' + LVL_MARK[s.lvl] : ''}${s.vip ? ' 💎' : ''}${i === me ? ' (ви)' : ''}${i === m.host ? ' (ведучий)' : ''}${s.online ? '' : ' 📴'}`;
     ul.appendChild(li);
   });
   for (let i = m.seats.length; i < m.cfg.max; i++) {
@@ -708,7 +806,7 @@ function showLobby(m) {
 }
 
 // my Telegram id: room links and the personal link carry it, so a new friend counts as my invite
-const myTgId = () => { const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user; return u && u.id ? String(u.id) : ''; };
+const myTgId = () => { const u = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) || LOGIN; return u && u.id ? String(u.id) : ''; };
 function inviteLink() {
   if (inTelegram || !location.search.includes('server=')) return `${APP_LINK}?startapp=${S.code}${myTgId() ? '_r' + myTgId() : ''}`;
   return `${location.origin}${location.pathname}?room=${S.code}&server=${encodeURIComponent(serverBase())}`;
@@ -716,7 +814,7 @@ function inviteLink() {
 const personalLink = () => `${APP_LINK}?startapp=r${myTgId()}`;
 
 function showInviteFriends() {
-  if (!inTelegram || !myTgId()) {
+  if (!signedIn || !myTgId()) {
     return showPanel({ kind: 'invite', icon: '👥', title: 'Запросити друзів', text: 'Особисте посилання є в грі в Telegram (@IgryUA_bot).', buttons: [{ text: 'Зрозуміло', sec: true, fn: hidePanel }] });
   }
   const link = personalLink();
@@ -734,9 +832,9 @@ function showInviteFriends() {
 
 // First visit in Telegram: welcome bonus (and the friend's invite, if the app was opened by his link)
 async function sayHello(ref) {
-  if (!inTelegram) return;
+  if (!signedIn) return;
   try {
-    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData, ref }) })).json();
+    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), ref }) })).json();
     if (!r.welcome) return;
     sfx('win'); haptic('success');
     const show = () => showPanel({

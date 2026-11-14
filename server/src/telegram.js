@@ -1,3 +1,4 @@
+import { SHOP } from '../../js/shop.js';
 // Telegram side of the server: Bot API calls, the webhook (commands in private chats and in the
 // players' group), the players' chat / news channel lookup.
 import * as durak from '../../js/durak-engine.js';
@@ -41,6 +42,59 @@ export async function statsCall(env, path, body) {
   return r.json();
 }
 
+// ---------- Telegram Stars ----------
+// payload = "<item>:<telegram user id>"
+export async function invoiceLink(env, user, item) {
+  const it = SHOP[item];
+  if (!it) return null;
+  const r = await tg(env, 'createInvoiceLink', {
+    title: it.title, description: it.desc, payload: `${item}:${user.id.slice(3)}`,
+    provider_token: '', currency: 'XTR', prices: [{ label: it.title, amount: it.price }],
+  });
+  return r.ok ? r.result : null;
+}
+async function preCheckout(q, env) {
+  const [item, uid] = String(q.invoice_payload || '').split(':');
+  const it = SHOP[item];
+  const ok = !!it && q.currency === 'XTR' && q.total_amount === it.price && uid === String(q.from.id);
+  return tg(env, 'answerPreCheckoutQuery', { pre_checkout_query_id: q.id, ok, ...(ok ? {} : { error_message: 'Товар змінився — відкрийте магазин ще раз.' }) });
+}
+async function paid(msg, env) {
+  const p = msg.successful_payment;
+  const [item] = String(p.invoice_payload || '').split(':');
+  const r = await statsCall(env, '/buy', { id: 'tg:' + msg.from.id, item, stars: p.total_amount, charge: p.telegram_payment_charge_id });
+  const it = SHOP[item];
+  const text = item === 'vip'
+    ? `💎 Дякуємо! VIP діє до <b>${new Date(r.vip_until || Date.now()).toLocaleDateString('uk-UA', { timeZone: 'Europe/Kyiv' })}</b>: значок 💎 біля імені й усі преміум-оформлення.`
+    : `🎉 Дякуємо за покупку! «${esc(it ? it.title : item)}» — ваше назавжди. Оберіть у грі: 🎨 Оформлення.`;
+  return tg(env, 'sendMessage', { chat_id: msg.chat.id, parse_mode: 'HTML', text });
+}
+
+export function adminText(a) {
+  const name = g => (GAMES[g] ? GAMES[g].icon + ' ' + GAMES[g].title : g);
+  const list = rows => (rows.length ? rows.map(r => `${name(r.game)} — ${r.n}`).join('\n') : '—');
+  const bots = c => { const r = Object.entries(c).filter(([k]) => k.startsWith('bot:')).sort((x, y) => y[1] - x[1]);
+    return r.length ? r.map(([k, n]) => `${name(k.slice(4))} — ${n}`).join('\n') : '—'; };
+  const total = c => Object.entries(c).filter(([k]) => k.startsWith('bot:')).reduce((s, [, n]) => s + n, 0);
+  const sumRows = rows => rows.reduce((s, r) => s + r.n, 0);
+  return `📊 <b>Статистика «Ігри UA»</b>
+
+👥 Гравців усього: <b>${a.players}</b>
+🆕 Нових: сьогодні <b>${a.newToday}</b> · за тиждень <b>${a.new7}</b> (за запрошенням ${a.refs7})
+🎮 Заходили: сьогодні <b>${a.activeToday}</b> · за тиждень <b>${a.active7}</b>
+🟢 Зараз онлайн: <b>${a.online}</b>
+
+🌐 <b>Онлайн-ігри</b> сьогодні ${sumRows(a.onlineToday)} · за тиждень ${sumRows(a.online7)}:
+${list(a.online7)}
+
+🤖 <b>Ігри з ботами</b> сьогодні ${total(a.botToday)} · за тиждень ${total(a.bot7)}:
+${bots(a.bot7)}
+
+🔔 Нагадування: можна писати ${a.reminders.canWrite}, вимкнули ${a.reminders.muted}, надіслано сьогодні ${a.reminders.today}
+
+⭐ <b>Stars</b>: сьогодні ${a.stars.today} · за тиждень ${a.stars.week} · усього ${a.stars.all} (покупців ${a.stars.buyers}, VIP зараз ${a.stars.vips})`;
+}
+
 export function topText(rows, title) {
   if (!rows.length) return `${title}\n\nПоки що порожньо — зіграйте онлайн з друзями, щоб потрапити сюди!`;
   const medal = i => ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
@@ -52,7 +106,9 @@ const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', 
 
 export async function handleUpdate(update, env, makeRoom) {
   if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
+  if (update.pre_checkout_query) return preCheckout(update.pre_checkout_query, env);
   const msg = update.message;
+  if (msg && msg.successful_payment) return paid(msg, env);
   if (!msg || typeof msg.text !== 'string' || !msg.text.startsWith('/')) return;
   return handleCommand(msg, env, makeRoom);
 }
@@ -113,6 +169,18 @@ async function handleCommand(msg, env, makeRoom) {
     return reply(topText(rows, '🏆 <b>Топ гравців тижня</b>'));
   }
   const priv = chat.type === 'private';
+  if (priv && cmd === '/stats') {
+    // only for the admins of the news channel
+    // ADMIN_TEST only in server/.dev.vars: no admin check, the text goes to the log
+    const admins = env.ADMIN_TEST === '1' ? null : await tg(env, 'getChatAdministrators', { chat_id: CHANNEL });
+    if (admins && (!admins.ok || !admins.result.some(a => a.user && a.user.id === msg.from.id && !a.user.is_bot))) return;
+    const text = adminText(await statsCall(env, '/admin', {}));
+    if (env.ADMIN_TEST === '1') console.log(text);
+    return reply(text);
+  }
+  if (priv && cmd === '/paysupport') {
+    return reply('💳 <b>Покупки за ⭐ Stars</b>\nЗа зірки продаються лише оформлення (сорочки карт, столи) і VIP-значок — на гру вони не впливають.\nЯкщо з покупкою щось не так — напишіть сюди або в чат @ua_Igry з позначкою «оплата», ми розберемося.');
+  }
   if (priv && (cmd === '/stop' || cmd === '/notify')) {
     const on = cmd === '/notify';
     await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, on, pm: true });

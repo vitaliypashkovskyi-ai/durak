@@ -66,8 +66,8 @@ export function sfx(name) {
 // ---------- level marks next to names (shown to everyone at the table) ----------
 // level index from the server: 0 Новачок, 1 Аматор, 2 Гравець, 3 Досвідчений, 4 Майстер, 5 Легенда
 export const LVL_MARK = ['', '', '', '⭐', '🏅', '👑'];
-export const levels = { list: null };   // set by the app for online games
-export const mark = i => { const l = levels.list && levels.list[i]; return l && LVL_MARK[l] ? ' ' + LVL_MARK[l] : ''; };
+export const levels = { list: null, vip: null };   // set by the app for online games
+export const mark = i => { const l = levels.list && levels.list[i]; return (l && LVL_MARK[l] ? ' ' + LVL_MARK[l] : '') + (levels.vip && levels.vip[i] ? ' 💎' : ''); };
 
 let kind = null;
 export const panelKind = () => ($('ov').hidden ? null : kind);

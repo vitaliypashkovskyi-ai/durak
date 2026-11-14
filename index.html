@@ -57,7 +57,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 46;
+  var PAGE_VERSION = 47;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -293,6 +293,7 @@ body[data-table="ocean"]{--felt:#13807d;--felt2:#073838}
 .qbar span{display:block;height:100%;background:#4caf50}
 #reactBar button.phr{font-size:14px;padding:6px 10px}
 .rx b.ph{font-weight:600}
+.sharebox{width:100%;min-height:84px;border:1px solid #d6cfbf;border-radius:10px;padding:8px;font:14px/1.4 system-ui,sans-serif;resize:none;background:#fff;color:#1b1b1b;margin:6px 0}
 .tipbar{background:rgba(255,253,247,.96);color:#1b1b1b;border-radius:12px;padding:8px 10px;margin:4px auto 6px;max-width:520px;font-size:14px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .tipbtns{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}
 .tipbtns button{border:0;border-radius:9px;padding:6px 12px;font-size:14px;font-weight:700;background:var(--blue);color:#fff;cursor:pointer}
@@ -524,44 +525,44 @@ body[data-table="ocean"]{--felt:#13807d;--felt2:#073838}
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=46",
-  "./js/host.js": "./js/host.js?v=46",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=46",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=46",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=46",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=46",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=46",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=46",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=46",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=46",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=46",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=46",
-  "./js/spy-data.js": "./js/spy-data.js?v=46",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=46",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=46",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=46",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=46",
-  "./js/svara-engine.js": "./js/svara-engine.js?v=46",
-  "./js/svara-ui.js": "./js/svara-ui.js?v=46",
-  "./js/checkers-engine.js": "./js/checkers-engine.js?v=46",
-  "./js/checkers-ui.js": "./js/checkers-ui.js?v=46",
-  "./js/nardy-engine.js": "./js/nardy-engine.js?v=46",
-  "./js/nardy-ui.js": "./js/nardy-ui.js?v=46",
-  "./js/dice-engine.js": "./js/dice-engine.js?v=46",
-  "./js/dice-ui.js": "./js/dice-ui.js?v=46",
-  "./js/shop.js": "./js/shop.js?v=46",
-  "./js/level.js": "./js/level.js?v=46",
-  "./js/pref-engine.js": "./js/pref-engine.js?v=46",
-  "./js/pref-ui.js": "./js/pref-ui.js?v=46",
-  "./js/quiz-engine.js": "./js/quiz-engine.js?v=46",
-  "./js/quiz-data.js": "./js/quiz-data.js?v=46",
-  "./js/quiz-ui.js": "./js/quiz-ui.js?v=46",
-  "./js/klondike-engine.js": "./js/klondike-engine.js?v=46",
-  "./js/klondike-ui.js": "./js/klondike-ui.js?v=46",
-  "./js/chess-engine.js": "./js/chess-engine.js?v=46",
-  "./js/chess-ui.js": "./js/chess-ui.js?v=46"
+  "./js/common.js": "./js/common.js?v=47",
+  "./js/host.js": "./js/host.js?v=47",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=47",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=47",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=47",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=47",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=47",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=47",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=47",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=47",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=47",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=47",
+  "./js/spy-data.js": "./js/spy-data.js?v=47",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=47",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=47",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=47",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=47",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=47",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=47",
+  "./js/checkers-engine.js": "./js/checkers-engine.js?v=47",
+  "./js/checkers-ui.js": "./js/checkers-ui.js?v=47",
+  "./js/nardy-engine.js": "./js/nardy-engine.js?v=47",
+  "./js/nardy-ui.js": "./js/nardy-ui.js?v=47",
+  "./js/dice-engine.js": "./js/dice-engine.js?v=47",
+  "./js/dice-ui.js": "./js/dice-ui.js?v=47",
+  "./js/shop.js": "./js/shop.js?v=47",
+  "./js/level.js": "./js/level.js?v=47",
+  "./js/pref-engine.js": "./js/pref-engine.js?v=47",
+  "./js/pref-ui.js": "./js/pref-ui.js?v=47",
+  "./js/quiz-engine.js": "./js/quiz-engine.js?v=47",
+  "./js/quiz-data.js": "./js/quiz-data.js?v=47",
+  "./js/quiz-ui.js": "./js/quiz-ui.js?v=47",
+  "./js/klondike-engine.js": "./js/klondike-engine.js?v=47",
+  "./js/klondike-ui.js": "./js/klondike-ui.js?v=47",
+  "./js/chess-engine.js": "./js/chess-engine.js?v=47",
+  "./js/chess-ui.js": "./js/chess-ui.js?v=47"
 } }
 </script>
-<script type="module" src="js/app.js?v=46"></script>
+<script type="module" src="js/app.js?v=47"></script>
 </body>
 </html>

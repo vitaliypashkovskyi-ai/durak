@@ -1010,9 +1010,24 @@ function shareInvite() {
 // Send something to any chat: in new Telegram — a card with a picture and a button (prepared message),
 // otherwise the usual «share a link» window.
 async function shareCard({ text, url, button }) {
+  const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
   const fallback = () => {
-    const u = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
-    if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank');
+    // phones: Telegram's own share window
+    if (inTelegram && ['android', 'ios'].includes(tg.platform) && tg.openTelegramLink) return tg.openTelegramLink(shareUrl);
+    // computer / web: Telegram there does not open share links from a mini app — copy the text
+    // with the link at once and offer the share page in the browser
+    const all = text + '\n' + url;
+    const copy = () => { try { navigator.clipboard.writeText(all).then(() => toast('Скопійовано — вставте другу в чат (Ctrl+V)'), () => toast('Виділіть і скопіюйте посилання вручну')); } catch (e) { toast('Виділіть і скопіюйте посилання вручну'); } };
+    copy();
+    const back = panelKind() === 'lobby' && S && S.lobby ? () => showLobby(S.lobby) : hidePanel;
+    const body = document.createElement('div');
+    const box = document.createElement('textarea'); box.className = 'sharebox'; box.readOnly = true; box.value = all;
+    box.onclick = () => box.select();
+    body.appendChild(box);
+    showPanel({ kind: 'share', icon: '📨', title: 'Надіслати другу', text: 'Текст із посиланням уже скопійовано — вставте його в чат із другом (Ctrl+V).', body, buttons: [
+      { text: '📋 Скопіювати ще раз', fn: copy },
+      { text: '📤 Відкрити вікно «Поділитися»', sec: true, fn: () => { if (inTelegram && tg.openLink) tg.openLink(shareUrl); else window.open(shareUrl, '_blank'); } },
+      { text: 'Готово', sec: true, fn: back }] });
   };
   // the card works reliably in the phone apps; desktop and web Telegram get the plain share window
   const phone = inTelegram && ['android', 'ios'].includes(tg.platform);

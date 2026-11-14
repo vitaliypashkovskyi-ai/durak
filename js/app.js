@@ -1013,7 +1013,20 @@ async function shareCard({ text, url, button }) {
   const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
   // Telegram's own share window, exactly as before 2026-11-14 (the user asked to remove the extra window)
   const fallback = () => {
-    if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(shareUrl); else window.open(shareUrl, '_blank');
+    if (!inTelegram) return window.open(shareUrl, '_blank');
+    // phones: Telegram's share window works
+    if (['android', 'ios'].includes(tg.platform) && tg.openTelegramLink) return tg.openTelegramLink(shareUrl);
+    // Telegram on a computer ignores share links from a mini app: copy the invitation instead
+    const all = text + '\n' + url;
+    const ok = () => toast('Скопійовано — вставте другу в чат (Ctrl+V)');
+    const fail = () => { try { prompt('Скопіюйте й надішліть другу:', all); } catch (e) {} };
+    try {
+      if (navigator.clipboard) navigator.clipboard.writeText(all).then(ok, () => {
+        const t = document.createElement('textarea'); t.value = all; document.body.appendChild(t); t.select();
+        const done = document.execCommand('copy'); t.remove(); done ? ok() : fail();
+      });
+      else fail();
+    } catch (e) { fail(); }
   };
   // Picture cards (tg.shareMessage) did not open on the user's phone (2026-11-14), so they are off:
   // phones get Telegram's own share window, computers the copy window. Set CARDS = true to try again.

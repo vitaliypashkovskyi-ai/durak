@@ -1033,7 +1033,9 @@ async function shareCard({ text, url, button }) {
     if (inTelegram) buttons.push({ text: '✈️ Надіслати в Telegram', sec: true, fn: () => { try { if (phone && tg.openTelegramLink) tg.openTelegramLink(shareUrl); else tg.openLink(shareUrl); } catch (e) { window.open(shareUrl, '_blank'); } } });
     else buttons.push({ text: '✈️ Надіслати в Telegram', sec: true, fn: () => window.open(shareUrl, '_blank') });
     buttons.push({ text: 'Готово', sec: true, fn: back });
-    showPanel({ kind: 'share', icon: '📨', title: 'Надіслати другу', text: 'Текст із посиланням уже скопійовано — вставте його в чат із другом. Або оберіть спосіб нижче.', body, buttons });
+    // as before 2026-11-14: Telegram's own share window right away (inside the click, so Telegram allows it)
+    if (inTelegram && tg.openTelegramLink) { try { tg.openTelegramLink(shareUrl); } catch (e) {} }
+    showPanel({ kind: 'share', icon: '📨', title: 'Надіслати другу', text: 'Якщо вікно Telegram не відкрилося — текст із посиланням уже скопійовано: вставте його в чат із другом. Або оберіть спосіб нижче.', body, buttons });
     setTimeout(copy, 50);
   };
   // Picture cards (tg.shareMessage) did not open on the user's phone (2026-11-14), so they are off:

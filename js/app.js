@@ -456,6 +456,7 @@ function showSetup(game) {
       ...(g.noBots || g.solo ? [] : [{ text: '🤖 Грати з ботами', fn: () => startLocal(game, c(), cfg.n) }]),
       ...(g.solo ? [{ text: '🂠 Нова роздача', fn: () => startLocal(game, { draw: cfg.draw === 3 ? 3 : 1 }, 1) }] : [{ text: '👥 Кімната для друзів', fn: () => joinRoom(genCode(), Object.assign({ game }, c())) }]),
       ...(g.noRandom ? [] : [{ text: '🎲 Випадковий суперник', fn: () => findMatch(game, c0()) }]),
+      ...(g.minP <= 2 && !g.solo && game !== 'quiz' ? [{ text: '⚔️ Кинути виклик другу', fn: () => challenge(game, c()) }] : []),
       { text: '📖 Правила', sec: true, fn: () => showRules(game, () => showSetup(game)) },
       { text: 'Назад', sec: true, fn: hidePanel },
     ],
@@ -536,7 +537,7 @@ function resumeLocal() {
   const s = savedGame();
   if (!s) return showHub();
   const G = s.G;
-  shiftTimes(G, Date.now() - s.at);
+  shiftTimes(G, s.at ? Date.now() - s.at : 0);
   G.ev = null;
   localNum = Math.max(localNum, G.num || 0);
   runLocal(s.game, s.cfg, s.n, G);
@@ -578,6 +579,7 @@ function showResult(v) {
     if (others) text += (text ? '\n' : '') + `Ще раз хочуть: ${others}`;
     buttons.push({ text: mine ? 'Чекаємо інших…' : 'Ще раз', disabled: mine, fn: () => netSend({ t: 'again' }) });
   }
+  if (r.res === 'win') buttons.unshift({ text: '📣 Поділитися перемогою', fn: () => shareWin(v.game, r) });
   buttons.push({ text: 'Меню ігор', sec: true, fn: showHub });
   showPanel({ kind: 'result', icon: r.icon, title: r.title, text, buttons });
 }
@@ -807,6 +809,11 @@ function onRoomMsg(m) {
     return showPanel({ kind: 'error', icon: '😕', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] });
   }
   if (m.type === 'lobby' || m.type === 'state') setPref('lastRoom', { code: S.code, game: m.game, t: Date.now() });
+  if (m.type === 'lobby' && S.challenge) {
+    S.challenge = false;
+    const g = GAMES[m.game];
+    shareCard({ text: `⚔️ ${myName()} кидає тобі виклик: ${g.icon} ${g.title}!\nПриймаєш? Хто переможе? 😏`, url: inviteLink(), button: '⚔️ Прийняти виклик' });
+  }
   if (m.type === 'lobby') { S.game = m.game; S.lobby = m; if (S.callFriend) { const f = S.callFriend; S.callFriend = null; callFriend(f, m.game); } return showLobby(m); }
   if (m.type !== 'state') return;
   if (!S.mounted || S.game !== m.game) { S.game = m.game; S.mounted = true; openGame(m.game); }
@@ -997,8 +1004,34 @@ async function sayHello(ref) {
 function shareInvite() {
   if (!S || !S.code) return;
   const g = GAMES[S.game] || GAMES.durak;
-  const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}\n(@IgryUA_bot → «Грати» → «Увійти за кодом»)`);
-  if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
+  shareCard({ text: `🎲 Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}`, url: inviteLink(), button: `▶ Приєднатися (${g.title})` });
+}
+
+// Send something to any chat: in new Telegram — a card with a picture and a button (prepared message),
+// otherwise the usual «share a link» window.
+async function shareCard({ text, url, button }) {
+  const fallback = () => {
+    const u = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
+    if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank');
+  };
+  if (!inTelegram || !tg.shareMessage || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return fallback();
+  try {
+    const r = await (await fetch(`${httpBase()}/api/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), text, url, button }) })).json();
+    if (!r.id) return fallback();
+    tg.shareMessage(r.id, sent => { if (sent) { toast('Надіслано 👍'); haptic('success'); } });
+  } catch (e) { fallback(); }
+}
+const myLink = () => (myTgId() ? personalLink() : APP_LINK);
+
+// a win worth telling about
+function shareWin(game, r) {
+  const g = GAMES[game];
+  shareCard({ text: `🏆 ${g.icon} ${g.title}: ${r.title.replace(/[!.]+$/, '')}!${r.text ? '\n' + r.text.split('\n')[0] : ''}\n\nЗможеш краще? Грай зі мною в «Ігри UA» 🎲`, url: myLink(), button: `${g.icon} Зіграти в ${g.title}` });
+}
+// a 1-on-1 challenge: a new room, the friend gets a card with «Прийняти виклик»
+function challenge(game, cfg) {
+  joinRoom(genCode(), Object.assign({ game }, cfg));
+  S.challenge = true;
 }
 function copyInvite() {
   if (!S || !S.code) return;

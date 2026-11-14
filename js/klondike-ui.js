@@ -130,8 +130,8 @@ function draw() {
 
 export function result(v) {
   V = v;
-  const mins = Math.max(1, Math.round((Date.now() - v.started) / 60000));
+  const mins = Number.isFinite(v.started) ? Math.max(1, Math.round((Date.now() - v.started) / 60000)) : null;
   return v.won
-    ? { res: 'win', icon: '🏆', title: 'Пасьянс зійшовся!', text: `${v.moves} ходів · близько ${mins} хв` }
+    ? { res: 'win', icon: '🏆', title: 'Пасьянс зійшовся!', text: `${v.moves} ходів` + (mins ? ` · близько ${mins} хв` : '') }
     : { res: 'lose', icon: '🂠', title: 'Не зійшовся', text: `У домах ${v.foundN.reduce((a, b) => a + b, 0)} з 52 карт. Спробуйте ще!` };
 }

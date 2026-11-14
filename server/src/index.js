@@ -30,6 +30,7 @@ const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpo
 // whoever is waiting (2+) starts and bots take the free seats.
 const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 4, rpoker: 3, svara: 3, dice: 3, spy: 5, mafia: 6, chess: 2, quiz: 4, pref: 3 };
 const MATCH_WAIT_MS = 25000;
+const SHARE_PIC = 'https://www.igryua.biz.ua/promo/promo-wide.png';
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
 const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
 const PHRASES = 8;   // ready-made table phrases, their texts live in the app (js/app.js PHRASES)
@@ -77,6 +78,20 @@ export default {
         reply_markup: { inline_keyboard: [[{ text: '▶ Приєднатися', url: joinUrl(code) }]] },
       }).catch(() => ({ ok: false }));
       return json({ ok: !!r.ok, why: r.ok ? null : 'no pm' });
+    }
+    if (url.pathname === '/api/share' && req.method === 'POST') {
+      // Telegram's «share a prepared message»: a card with the promo picture, the text and a button
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:') || user.web) return json({ error: 'not telegram' }, 401);
+      const link = String(body.url || ''), text = String(body.text || '').slice(0, 400), button = String(body.button || '🎲 Грати').slice(0, 40);
+      if (!link.startsWith('https://t.me/IgryUA_bot')) return json({ error: 'bad url' }, 400);
+      const r = await tg(env, 'savePreparedInlineMessage', {
+        user_id: Number(user.id.slice(3)), allow_user_chats: true, allow_group_chats: true, allow_channel_chats: true,
+        result: { type: 'photo', id: genCode() + genCode(), photo_url: SHARE_PIC, thumbnail_url: SHARE_PIC, caption: text,
+          reply_markup: { inline_keyboard: [[{ text: button, url: link }]] } },
+      }).catch(() => ({ ok: false }));
+      return r.ok ? json({ id: r.result.id }) : json({ error: r.description || 'failed' }, 400);
     }
     if (url.pathname === '/api/shop' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));

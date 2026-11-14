@@ -49,6 +49,11 @@ export default {
       return new Response('ok');
     }
     if (url.pathname === '/api/top') return json(await statsCall(env, '/top?period=' + (url.searchParams.get('period') === 'week' ? 'week' : 'all')));
+    if (url.pathname === '/api/tour' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = body.init ? await authenticate({ init: body.init }, env) : null;
+      return json(await statsCall(env, '/tour' + (user && user.id.startsWith('tg:') ? '?id=' + encodeURIComponent(user.id) : '')));
+    }
     if (url.pathname === '/api/profile' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);

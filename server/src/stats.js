@@ -1,14 +1,24 @@
 // Stats: one Durable Object (SQLite) with players' points, results for the weekly top,
 // and a cached lookup of the news channel and the players' chat linked to it.
-import { tg, CHANNEL, topText } from './telegram.js';
+import { tg, CHANNEL, topText, esc } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w' };
 const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
-  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w'];
+  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3'];
 const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
+// Weekly tournament: from Sunday 17:00 UTC (the cron) to the next one. Top-3 get bonus points and a cup.
+export const PRIZES = [30, 20, 10];
+const TOUR_HOUR = 17;   // UTC, same as the cron in wrangler.toml
+function lastSunday(now = Date.now()) {
+  const d = new Date(now);
+  d.setUTCHours(TOUR_HOUR, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  if (d.getTime() > now) d.setUTCDate(d.getUTCDate() - 7);
+  return d.getTime();
+}
 
 export function level(points) {
   let i = 0;
@@ -34,6 +44,8 @@ const ACHIEVEMENTS = [
   ['🕵️', 'Розвідник', '3 перемоги шпигуном', p => p.spyrole_w, 3],
   ['🔍', 'Ловець шпигунів', '5 перемог агентом у Шпигуні', p => p.spy_w - p.spyrole_w, 5],
   ['🤝', 'Душа компанії', 'Запросіть 5 друзів', p => p.refs, 5],
+  ['🏆', 'Чемпіон тижня', 'Виграйте турнір тижня', p => p.cup1, 1],
+  ['🏅', 'Призер', '3 рази потрапте в трійку турніру', p => (p.cup1 || 0) + (p.cup2 || 0) + (p.cup3 || 0), 3],
   ['🌈', 'Майстер на всі руки', 'Виграйте в кожну гру хоча б раз',
     p => ['durak_w', 'thousand_w', 'goat_w', 'battle_w', 'mafia_w', 'spy_w', 'rpoker_w', 'svara_w'].filter(c => p[c] > 0).length, 8],
 ];
@@ -78,6 +90,7 @@ export class Stats {
     if (url.pathname === '/top') return json(this.top(url.searchParams.get('period')));
     if (url.pathname === '/community') return json(await this.community());
     if (url.pathname === '/weekly') return json(await this.weekly());
+    if (url.pathname === '/tour') return json(this.tour(url.searchParams.get('id')));
     return new Response('not found', { status: 404 });
   }
 
@@ -105,7 +118,7 @@ export class Stats {
     const p = rows[0] || { name: '', points: 0, games: 0, wins: 0, durak_w: 0, battle_w: 0, mafia_w: 0, don_w: 0,
       thousand_w: 0, spy_w: 0, spyrole_w: 0, goat_w: 0, streak: 0, best_streak: 0, last_day: 0 };
     const rank = rows[0] ? this.sql.exec('SELECT COUNT(*) AS n FROM players WHERE points > ?', p.points).one().n + 1 : null;
-    const week = this.sql.exec('SELECT COALESCE(SUM(pts), 0) AS s FROM results WHERE id = ? AND ts > ?', String(id), Date.now() - WEEK).one().s;
+    const week = this.sql.exec('SELECT COALESCE(SUM(pts), 0) AS s FROM results WHERE id = ? AND ts > ?', String(id), this.tourStart()).one().s;
     const today = kyivDay();
     const streak = p.last_day >= today - 1 ? p.streak : 0;
     // next = what the next claim gives (today if not claimed yet, otherwise tomorrow)
@@ -153,13 +166,32 @@ export class Stats {
   }
 
   top(period) {
-    if (period === 'week') {
-      return this.sql.exec(`SELECT p.name AS name, SUM(r.pts) AS points, SUM(r.res = 'win') AS wins
-        FROM results r JOIN players p ON p.id = r.id WHERE r.ts > ? GROUP BY r.id ORDER BY points DESC, wins DESC LIMIT 10`,
-      Date.now() - WEEK).toArray();
-    }
+    if (period === 'week') return this.tourRows(10).map(({ name, points, wins }) => ({ name, points, wins }));
     return this.sql.exec('SELECT name, points, wins FROM players ORDER BY points DESC, wins DESC LIMIT 10').toArray();
   }
+
+  // ---------- weekly tournament ----------
+  kvGet(k) { const r = this.sql.exec('SELECT v FROM kv WHERE k = ?', k).toArray()[0]; return r ? JSON.parse(r.v) : null; }
+  kvSet(k, v) { this.sql.exec('INSERT INTO kv(k, v) VALUES(?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v', k, JSON.stringify(v)); }
+  // before the first close: the last Sunday cron (an hour back, so the cron itself sees the past week)
+  tourStart() { return this.kvGet('tour_start') || lastSunday(Date.now() - 3600 * 1000); }
+  tourRows(limit) {
+    return this.sql.exec(`SELECT r.id AS id, p.name AS name, SUM(r.pts) AS points, SUM(r.res = 'win') AS wins, MIN(r.ts) AS first
+      FROM results r JOIN players p ON p.id = r.id WHERE r.ts > ? GROUP BY r.id HAVING points > 0
+      ORDER BY points DESC, wins DESC, first ASC LIMIT ?`, this.tourStart(), limit).toArray();
+  }
+  // Standings for the app: time left, prizes, top-10, the player's place and last week's winners.
+  tour(id) {
+    const rows = this.tourRows(1000);
+    const i = id ? rows.findIndex(r => r.id === String(id)) : -1;
+    return {
+      start: this.tourStart(), end: lastSunday() + WEEK, now: Date.now(), prizes: PRIZES,
+      top: rows.slice(0, 10).map(({ name, points, wins }) => ({ name, points, wins })),
+      me: i >= 0 ? { place: i + 1, points: rows[i].points } : null,
+      last: this.kvGet('tour_last'),
+    };
+  }
+
 
   // The news channel and its linked discussion group (the players' chat), cached for an hour.
   async community() {
@@ -173,14 +205,33 @@ export class Stats {
     return c;
   }
 
+  // Cron (Sunday 17:00 UTC): close the tournament, pay the prizes, tell the winners and the channel.
   async weekly() {
-    const rows = this.top('week');
+    const now = Date.now();
+    // a repeated cron run must not pay twice (TOUR_MIN_GAP_MS only in server/.dev.vars for local tests)
+    const gap = this.env.TOUR_MIN_GAP_MS != null ? Number(this.env.TOUR_MIN_GAP_MS) : 6 * 86400 * 1000;
+    if (now - this.tourStart() < gap) return { posted: false, reason: 'too early' };
+    const rows = this.tourRows(10);
+    const winners = rows.slice(0, PRIZES.length).map((r, i) => ({ ...r, place: i + 1, prize: PRIZES[i] }));
+    for (const w of winners) {
+      this.sql.exec(`UPDATE players SET points = points + ?, cup${w.place} = cup${w.place} + 1 WHERE id = ?`, w.prize, w.id);
+    }
+    this.kvSet('tour_start', now);
+    this.kvSet('tour_last', { end: now, winners: winners.map(({ name, points, place, prize }) => ({ name, points, place, prize })) });
+    const medal = ['🥇', '🥈', '🥉'];
+    for (const w of winners) {
+      await tg(this.env, 'sendMessage', {
+        chat_id: w.id.slice(3), parse_mode: 'HTML',
+        text: `${medal[w.place - 1]} Вітаємо! Ви посіли <b>${w.place} місце</b> в турнірі тижня (${w.points} оч.) — вам <b>+${w.prize}</b> очок і кубок у профілі! Новий турнір уже почався 🎲`,
+      }).catch(() => {});
+    }
     if (!rows.length) return { posted: false };
     const { channelId } = await this.community();
     if (!channelId) return { posted: false };
+    const prizes = winners.map(w => `${medal[w.place - 1]} ${esc(w.name)} +${w.prize}`).join('\n');
     const r = await tg(this.env, 'sendMessage', {
       chat_id: channelId, parse_mode: 'HTML', disable_web_page_preview: true,
-      text: topText(rows, '🏆 <b>Топ-10 гравців тижня</b>') + '\n\nГрайте з друзями в @IgryUA_bot — і потрапляйте в топ! 🎲',
+      text: topText(rows, '🏆 <b>Підсумки турніру тижня</b>') + `\n\n🎁 <b>Призи:</b>\n${prizes}\n\nНовий турнір уже почався — грайте онлайн з друзями в @IgryUA_bot і забирайте призи: 🥇 +${PRIZES[0]}, 🥈 +${PRIZES[1]}, 🥉 +${PRIZES[2]} 🎲`,
     });
     return { posted: !!r.ok };
   }

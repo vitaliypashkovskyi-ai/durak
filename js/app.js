@@ -207,7 +207,7 @@ function showHub() {
   row2.className = 'hubrow';
   const rateBtn = document.createElement('button');
   rateBtn.className = 'hubact';
-  rateBtn.textContent = '🏆 Рейтинг';
+  rateBtn.textContent = '🏆 Турнір тижня';
   rateBtn.onclick = () => showRating('week');
   const giftBtn = document.createElement('button');
   const claimedToday = pref('dailyDay', '') === new Date().toLocaleDateString('en-CA');
@@ -472,9 +472,12 @@ async function claimDaily() {
 // ---------- rating ----------
 async function showRating(period) {
   showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
-  let top = [], me = null;
+  let top = [], me = null, tour = null;
   try {
-    top = await (await fetch(`${httpBase()}/api/top?period=${period}`)).json();
+    if (period === 'week') {
+      tour = await (await fetch(`${httpBase()}/api/tour`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: inTelegram ? tg.initData : '' }) })).json();
+      top = tour.top;
+    } else top = await (await fetch(`${httpBase()}/api/top?period=${period}`)).json();
     if (inTelegram) {
       const r = await fetch(`${httpBase()}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: tg.initData }) });
       if (r.ok) me = await r.json();
@@ -513,21 +516,40 @@ async function showRating(period) {
     add('p', 'muted', 'Свої очки побачите, коли відкриєте гру в Telegram (@IgryUA_bot).');
   }
   const tabs = document.createElement('div'); tabs.className = 'chips';
-  for (const [p, t] of [['week', 'Цього тижня'], ['all', 'За весь час']]) {
+  for (const [p, t] of [['week', '🏆 Турнір тижня'], ['all', 'За весь час']]) {
     const b = document.createElement('button'); b.className = 'chip' + (p === period ? ' on' : ''); b.textContent = t;
     b.onclick = () => showRating(p); tabs.appendChild(b);
   }
   body.appendChild(tabs);
+  if (tour) body.appendChild(tourBox(tour));
   const ol = document.createElement('ol'); ol.className = 'plist top';
   if (!top.length) { const li = document.createElement('li'); li.className = 'free'; li.textContent = 'Поки порожньо — зіграйте онлайн з друзями!'; ol.appendChild(li); }
   top.forEach((r, i) => {
     const li = document.createElement('li');
-    li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name} — ${r.points} оч.`;
+    li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${r.name} — ${r.points} оч.` + (tour && tour.prizes[i] ? ` · приз +${tour.prizes[i]}` : '');
     ol.appendChild(li);
   });
   body.appendChild(ol);
   add('p', 'muted', 'Очки: перемога +3, нічия +1. Рахуються онлайн-ігри, де грають щонайменше двоє людей.');
   showPanel({ kind: 'rating', icon: '🏆', title: 'Рейтинг', body, buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+}
+
+// Weekly tournament: time left, prizes, my place, last week's winners.
+function tourBox(t) {
+  const box = document.createElement('div'); box.className = 'tourbox';
+  const line = (text, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); };
+  const left = Math.max(0, t.end - t.now), d = Math.floor(left / 86400000), h = Math.floor(left % 86400000 / 3600000), m = Math.floor(left % 3600000 / 60000);
+  line(`⏳ До кінця турніру: ${d ? d + ' дн ' : ''}${h} год${d ? '' : ` ${m} хв`}`, 'tl1');
+  let endsAt = '';
+  try { endsAt = new Date(t.end).toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', weekday: 'long', hour: '2-digit', minute: '2-digit' }); } catch (e) {}
+  if (endsAt) line(`Підсумки: ${endsAt} (за Києвом)`, 'sub');
+  line(`🎁 Призи: 🥇 +${t.prizes[0]} · 🥈 +${t.prizes[1]} · 🥉 +${t.prizes[2]} очок і кубок`);
+  if (t.me) line(`Ваше місце: ${t.me.place} · ${t.me.points} оч.` + (t.me.place <= 3 ? ' — ви в призах! 🔥' : ''), 'tme');
+  else if (inTelegram) line('Зіграйте онлайн з друзями — і ви в турнірі!', 'sub');
+  if (t.last && t.last.winners && t.last.winners.length) {
+    line('Минулого тижня: ' + t.last.winners.map(w => `${['🥇', '🥈', '🥉'][w.place - 1]} ${w.name}`).join('  '), 'sub');
+  }
+  return box;
 }
 
 function hello(extra) {

@@ -54,7 +54,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 33;
+  var PAGE_VERSION = 34;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -259,6 +259,11 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
 #pBtns button{padding:8px 0;min-width:40px;font-size:16px}
 #pBtns button:disabled{opacity:.35}
 
+.tourbox{background:#fff3cf;border:1px solid #e9c25a;border-radius:12px;padding:10px 12px;margin:8px 0;text-align:left;font-size:14px;line-height:1.45}
+.tourbox .tl1{font-weight:700}
+.tourbox .tme{font-weight:700;color:#9a6a00}
+.tourbox .sub{color:#666;font-size:13px}
+
 /* svara */
 #sInfo{flex-direction:column;align-items:center;gap:2px}
 #sBtns{flex-wrap:wrap;gap:6px}
@@ -369,27 +374,27 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=33",
-  "./js/host.js": "./js/host.js?v=33",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=33",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=33",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=33",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=33",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=33",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=33",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=33",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=33",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=33",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=33",
-  "./js/spy-data.js": "./js/spy-data.js?v=33",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=33",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=33",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=33",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=33",
-  "./js/svara-engine.js": "./js/svara-engine.js?v=33",
-  "./js/svara-ui.js": "./js/svara-ui.js?v=33"
+  "./js/common.js": "./js/common.js?v=34",
+  "./js/host.js": "./js/host.js?v=34",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=34",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=34",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=34",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=34",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=34",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=34",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=34",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=34",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=34",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=34",
+  "./js/spy-data.js": "./js/spy-data.js?v=34",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=34",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=34",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=34",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=34",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=34",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=34"
 } }
 </script>
-<script type="module" src="js/app.js?v=33"></script>
+<script type="module" src="js/app.js?v=34"></script>
 </body>
 </html>

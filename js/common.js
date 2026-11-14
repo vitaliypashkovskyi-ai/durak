@@ -91,6 +91,15 @@ export function showPanel(o) {
     e.onclick = b.fn;
     box.appendChild(e);
   });
+  // ✕ in the corner = the panel's own «back / close / cancel» button (no such button — no ✕)
+  const close = (o.buttons || []).find(b => !b.disabled && /^(Назад|Закрити|Скасувати|Готово|Зрозуміло|Вийти|Грати далі|Пізніше)$/.test(b.text.trim()));
+  if (close) {
+    const x = document.createElement('button');
+    x.className = 'pclose'; x.type = 'button'; x.textContent = '✕'; x.title = 'Закрити';
+    x.setAttribute('aria-label', 'Закрити');
+    x.onclick = close.fn;
+    p.appendChild(x);
+  }
   $('ov').hidden = false;
   return p;
 }

@@ -39,6 +39,8 @@ import * as spiderUI from './spider-ui.js';
 import { SHOP } from './shop.js';
 import { LEVELS, HARD_GAMES, NO_LEVEL, levelOf } from './level.js';
 import { Host } from './host.js';
+import { LANG, setLang, startTranslating } from './i18n.js';
+startTranslating();
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
 const APP_LINK = 'https://t.me/IgryUA_bot';    // bot's main Mini App: ?startapp=CODE
@@ -201,6 +203,16 @@ function drawLooks(lvl, points) {
     });
     body.append(l, box);
   };
+  { // interface language: the label carries both words so either reader finds it
+    const l = document.createElement('div'); l.className = 'lbl'; l.textContent = '🌐 Мова / Language';
+    const box = document.createElement('div'); box.className = 'chips';
+    [['uk', '🇺🇦 Українська'], ['en', '🇬🇧 English']].forEach(([v, text]) => {
+      const b = document.createElement('button'); b.className = 'chip' + (LANG === v ? ' on' : ''); b.textContent = text;
+      b.onclick = () => { if (LANG !== v) setLang(v); };
+      box.appendChild(b);
+    });
+    body.append(l, box);
+  }
   comfort('🔠 Розмір карт і тексту', 'big', [[false, 'Звичайний'], [true, 'Великий']]);
   comfort('☀️ Яскравість столу', 'bright', [['', 'Звичайна'], ['bright', 'Світліша'], ['dim', 'Темніша']]);
   section('Сорочка карт', 'back');

@@ -57,7 +57,7 @@
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 60;
+  var PAGE_VERSION = 61;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -574,50 +574,52 @@ body[data-bright="dim"] #app{filter:brightness(.78)}
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=60",
-  "./js/host.js": "./js/host.js?v=60",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=60",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=60",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=60",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=60",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=60",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=60",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=60",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=60",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=60",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=60",
-  "./js/spy-data.js": "./js/spy-data.js?v=60",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=60",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=60",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=60",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=60",
-  "./js/svara-engine.js": "./js/svara-engine.js?v=60",
-  "./js/svara-ui.js": "./js/svara-ui.js?v=60",
-  "./js/checkers-engine.js": "./js/checkers-engine.js?v=60",
-  "./js/checkers-ui.js": "./js/checkers-ui.js?v=60",
-  "./js/nardy-engine.js": "./js/nardy-engine.js?v=60",
-  "./js/nardy-ui.js": "./js/nardy-ui.js?v=60",
-  "./js/dice-engine.js": "./js/dice-engine.js?v=60",
-  "./js/dice-ui.js": "./js/dice-ui.js?v=60",
-  "./js/shop.js": "./js/shop.js?v=60",
-  "./js/level.js": "./js/level.js?v=60",
-  "./js/spider-engine.js": "./js/spider-engine.js?v=60",
-  "./js/spider-ui.js": "./js/spider-ui.js?v=60",
-  "./js/mines-engine.js": "./js/mines-engine.js?v=60",
-  "./js/mines-ui.js": "./js/mines-ui.js?v=60",
-  "./js/bgammon-engine.js": "./js/bgammon-engine.js?v=60",
-  "./js/bgammon-ui.js": "./js/bgammon-ui.js?v=60",
-  "./js/pref-engine.js": "./js/pref-engine.js?v=60",
-  "./js/pref-ui.js": "./js/pref-ui.js?v=60",
-  "./js/quiz-engine.js": "./js/quiz-engine.js?v=60",
-  "./js/quiz-data.js": "./js/quiz-data.js?v=60",
-  "./js/quiz-ui.js": "./js/quiz-ui.js?v=60",
-  "./js/klondike-engine.js": "./js/klondike-engine.js?v=60",
-  "./js/klondike-ui.js": "./js/klondike-ui.js?v=60",
-  "./js/chess-engine.js": "./js/chess-engine.js?v=60",
-  "./js/chess-ui.js": "./js/chess-ui.js?v=60"
+  "./js/common.js": "./js/common.js?v=61",
+  "./js/i18n.js": "./js/i18n.js?v=61",
+  "./js/i18n-en.js": "./js/i18n-en.js?v=61",
+  "./js/host.js": "./js/host.js?v=61",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=61",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=61",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=61",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=61",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=61",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=61",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=61",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=61",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=61",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=61",
+  "./js/spy-data.js": "./js/spy-data.js?v=61",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=61",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=61",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=61",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=61",
+  "./js/svara-engine.js": "./js/svara-engine.js?v=61",
+  "./js/svara-ui.js": "./js/svara-ui.js?v=61",
+  "./js/checkers-engine.js": "./js/checkers-engine.js?v=61",
+  "./js/checkers-ui.js": "./js/checkers-ui.js?v=61",
+  "./js/nardy-engine.js": "./js/nardy-engine.js?v=61",
+  "./js/nardy-ui.js": "./js/nardy-ui.js?v=61",
+  "./js/dice-engine.js": "./js/dice-engine.js?v=61",
+  "./js/dice-ui.js": "./js/dice-ui.js?v=61",
+  "./js/shop.js": "./js/shop.js?v=61",
+  "./js/level.js": "./js/level.js?v=61",
+  "./js/spider-engine.js": "./js/spider-engine.js?v=61",
+  "./js/spider-ui.js": "./js/spider-ui.js?v=61",
+  "./js/mines-engine.js": "./js/mines-engine.js?v=61",
+  "./js/mines-ui.js": "./js/mines-ui.js?v=61",
+  "./js/bgammon-engine.js": "./js/bgammon-engine.js?v=61",
+  "./js/bgammon-ui.js": "./js/bgammon-ui.js?v=61",
+  "./js/pref-engine.js": "./js/pref-engine.js?v=61",
+  "./js/pref-ui.js": "./js/pref-ui.js?v=61",
+  "./js/quiz-engine.js": "./js/quiz-engine.js?v=61",
+  "./js/quiz-data.js": "./js/quiz-data.js?v=61",
+  "./js/quiz-ui.js": "./js/quiz-ui.js?v=61",
+  "./js/klondike-engine.js": "./js/klondike-engine.js?v=61",
+  "./js/klondike-ui.js": "./js/klondike-ui.js?v=61",
+  "./js/chess-engine.js": "./js/chess-engine.js?v=61",
+  "./js/chess-ui.js": "./js/chess-ui.js?v=61"
 } }
 </script>
-<script type="module" src="js/app.js?v=60"></script>
+<script type="module" src="js/app.js?v=61"></script>
 </body>
 </html>

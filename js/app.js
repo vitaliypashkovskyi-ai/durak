@@ -1016,11 +1016,13 @@ async function shareCard({ text, url, button }) {
     if (!inTelegram) return window.open(shareUrl, '_blank');
     // Telegram's share window (works on phones, whatever the platform is called there)
     try { if (tg.openTelegramLink) tg.openTelegramLink(shareUrl); } catch (e) {}
-    // Telegram on a computer / web ignores it: copy the invitation as well
-    if (!['tdesktop', 'macos', 'weba', 'webk', 'web', 'unigram'].includes(tg.platform)) return;
+    // Telegram on a computer ignores it: copy the invitation as well. «Computer» is decided by the device
+    // (a mouse, no touch screen), not by tg.platform — the user's phone reported a desktop-like platform.
+    const computer = window.matchMedia && matchMedia('(pointer: fine)').matches && !navigator.maxTouchPoints;
+    if (!computer) return;
     const all = text + '\n' + url;
     const ok = () => toast('Скопійовано — вставте другу в чат (Ctrl+V)');
-    const fail = () => { try { prompt('Скопіюйте й надішліть другу:', all); } catch (e) {} };
+    const fail = () => toast('Не вдалося скопіювати — скористайтеся «📋 Скопіювати посилання»');
     try {
       if (navigator.clipboard) navigator.clipboard.writeText(all).then(ok, () => {
         const t = document.createElement('textarea'); t.value = all; document.body.appendChild(t); t.select();

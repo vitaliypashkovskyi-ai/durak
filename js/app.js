@@ -812,7 +812,7 @@ function onRoomMsg(m) {
   if (m.type === 'lobby' && S.challenge) {
     S.challenge = false;
     const g = GAMES[m.game];
-    shareCard({ text: `⚔️ ${myName()} кидає тобі виклик: ${g.icon} ${g.title}!\nПриймаєш? Хто переможе? 😏`, url: inviteLink(), button: '⚔️ Прийняти виклик' });
+    if (!inlineShare(`r ${S.code} ${m.game}`)) shareCard({ text: `⚔️ ${myName()} кидає тобі виклик: ${g.icon} ${g.title}!\nПриймаєш? Хто переможе? 😏`, url: inviteLink(), button: '⚔️ Прийняти виклик' });
   }
   if (m.type === 'lobby') { S.game = m.game; S.lobby = m; if (S.callFriend) { const f = S.callFriend; S.callFriend = null; callFriend(f, m.game); } return showLobby(m); }
   if (m.type !== 'state') return;
@@ -1003,12 +1003,19 @@ async function sayHello(ref) {
 }
 function shareInvite() {
   if (!S || !S.code) return;
+  if (inlineShare(`r ${S.code} ${S.game}`)) return;
   const g = GAMES[S.game] || GAMES.durak;
   // exactly yesterday's working invitation
   const url = 'https://t.me/share/url?url=' + encodeURIComponent(inviteLink()) + '&text=' + encodeURIComponent(`Зіграймо: ${g.icon} ${g.title}! Код кімнати: ${S.code}\n(@IgryUA_bot → «Грати» → «Увійти за кодом»)`);
   if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank');
 }
 
+// Telegram's official way for mini apps: pick a chat, the bot puts a ready invitation card there
+// (needs inline mode on in BotFather; until then Telegram throws and we fall back).
+function inlineShare(query) {
+  if (!inTelegram || !tg.switchInlineQuery || !(tg.isVersionAtLeast && tg.isVersionAtLeast('6.7'))) return false;
+  try { tg.switchInlineQuery(query, ['users', 'groups', 'channels']); return true; } catch (e) { return false; }
+}
 // Send something to any chat: Telegram's share window, exactly the code that worked on phones
 // (no device checks). On a computer Telegram ignores it — there is a separate «📋 Скопіювати» button.
 function shareCard({ text, url }) {
@@ -1032,6 +1039,7 @@ const myLink = () => (myTgId() ? personalLink() : APP_LINK);
 // a win worth telling about
 const winText = (game, r) => { const g = GAMES[game]; return `🏆 ${g.icon} ${g.title}: ${r.title.replace(/[!.]+$/, '')}!${r.text ? '\n' + r.text.split('\n')[0] : ''}\n\nЗможеш краще? Грай зі мною в «Ігри UA» 🎲`; };
 function shareWin(game, r) {
+  if (inlineShare(`w ${game}`)) return;
   shareCard({ text: winText(game, r), url: myLink() });
 }
 // a 1-on-1 challenge: a new room, the friend gets a card with «Прийняти виклик»

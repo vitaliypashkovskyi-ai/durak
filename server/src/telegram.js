@@ -46,6 +46,38 @@ export async function statsCall(env, path, body) {
   return r.json();
 }
 
+// ---------- inline mode: «@IgryUA_bot …» in any chat; the game opens it with switchInlineQuery ----------
+// query: "r CODE game" — invite to a room; "w game" — I won; anything else — a general invitation.
+// Every link carries the sender's id, so a friend who joins brings him +15.
+const PIC = 'https://www.igryua.biz.ua/promo/promo-wide.png';
+async function inlineQuery(q, env) {
+  const ref = '_r' + q.from.id, words = String(q.query || '').trim().split(/\s+/);
+  const results = [];
+  const card = (id, title, description, text, button, url) => results.push({
+    type: 'article', id, title, description, thumbnail_url: PIC,
+    input_message_content: { message_text: text, parse_mode: 'HTML' },
+    reply_markup: { inline_keyboard: [[{ text: button, url }]] },
+  });
+  const name = esc(q.from.first_name || 'Друг');
+  if (words[0] === 'r' && /^[A-Z0-9]{4,8}$/.test(words[1] || '')) {
+    const g = GAMES[words[2]] || { icon: '🎲', title: 'гру' };
+    card('room' + words[1], `${g.icon} Запросити в ${g.title}`, `Кімната ${words[1]} — друг одразу сяде за ваш стіл`,
+      `🎲 <b>${name}</b> кличе тебе зіграти: ${g.icon} <b>${esc(g.title)}</b>!
+Кімната ${words[1]} — натисни кнопку й сідай за стіл.`,
+      `▶ Приєднатися`, joinUrl(words[1] + ref));
+  } else if (words[0] === 'w' && GAMES[words[1]]) {
+    const g = GAMES[words[1]];
+    card('win' + words[1], `🏆 Похвалитися перемогою`, `${g.icon} ${g.title}`,
+      `🏆 <b>${name}</b> щойно виграв у ${g.icon} <b>${esc(g.title)}</b>!
+Зможеш краще? Грай в «Ігри UA» 🎲`,
+      `${g.icon} Зіграти`, `https://t.me/${BOT}?startapp=r${q.from.id}`);
+  }
+  card('invite', '🎲 Запросити в «Ігри UA»', 'Дурень, Покер, Шахи, Нарди й ще 11 ігор — бонус +5 другові',
+    `🎲 <b>${name}</b> запрошує тебе в «Ігри UA»: Дурень, Покер, Преферанс, Шахи, Нарди, Мафія й ще 9 ігор — прямо в Telegram!`,
+    '🎲 Грати', `https://t.me/${BOT}?startapp=r${q.from.id}`);
+  return tg(env, 'answerInlineQuery', { inline_query_id: q.id, results, cache_time: 0, is_personal: true });
+}
+
 // ---------- Telegram Stars ----------
 // payload = "<item>:<telegram user id>"
 export async function invoiceLink(env, user, item) {
@@ -111,6 +143,7 @@ const GROUP_CMDS = { '/durak': 'durak', '/battle': 'battle', '/mafia': 'mafia', 
 export async function handleUpdate(update, env, makeRoom) {
   if (update.callback_query) return handleCallback(update.callback_query, env, makeRoom);
   if (update.pre_checkout_query) return preCheckout(update.pre_checkout_query, env);
+  if (update.inline_query) return inlineQuery(update.inline_query, env);
   const msg = update.message;
   if (msg && msg.successful_payment) return paid(msg, env);
   if (!msg || typeof msg.text !== 'string' || !msg.text.startsWith('/')) return;

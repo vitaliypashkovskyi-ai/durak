@@ -11,10 +11,27 @@
 <meta property="og:image" content="https://www.igryua.biz.ua/promo/promo-wide.png">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
+// Opened in a normal browser (not inside Telegram) → send the visitor to the bot, keeping a room code.
+// Stays on the page: inside Telegram, on localhost (tests), with ?server= or ?web=1 (kept for the tab).
+(function () {
+  try {
+    var W = window.Telegram && window.Telegram.WebApp;
+    var inTg = !!(W && (W.initData || (W.platform && W.platform !== 'unknown'))) || /tgWebApp/.test(location.hash);
+    var q = new URLSearchParams(location.search);
+    if (q.get('web') === '1') sessionStorage.setItem('games.web', '1');
+    var stay = inTg || sessionStorage.getItem('games.web') === '1' || q.has('server') ||
+      /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || /bot|crawl|spider|lighthouse/i.test(navigator.userAgent);
+    if (stay) return;
+    var room = (q.get('room') || '').replace(/[^A-Za-z0-9_]/g, '');
+    location.replace('https://t.me/IgryUA_bot' + (room ? '?startapp=' + room : ''));
+  } catch (e) {}
+})();
+</script>
+<script>
 // Telegram may keep an old copy of this page. Compare with version.json (never cached) and reload
 // with a new address if the site has a newer release. PAGE_VERSION = the same number as ?v= below.
 (function () {
-  var PAGE_VERSION = 28;
+  var PAGE_VERSION = 29;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -304,25 +321,25 @@ body[data-table="night"] #app{background:radial-gradient(ellipse at 50% 45%,#2f2
      Bump V everywhere on this line block at each release. -->
 <script type="importmap">
 { "imports": {
-  "./js/common.js": "./js/common.js?v=28",
-  "./js/host.js": "./js/host.js?v=28",
-  "./js/durak-engine.js": "./js/durak-engine.js?v=28",
-  "./js/durak-ui.js": "./js/durak-ui.js?v=28",
-  "./js/battle-engine.js": "./js/battle-engine.js?v=28",
-  "./js/battle-ui.js": "./js/battle-ui.js?v=28",
-  "./js/mafia-engine.js": "./js/mafia-engine.js?v=28",
-  "./js/mafia-ui.js": "./js/mafia-ui.js?v=28",
-  "./js/thousand-engine.js": "./js/thousand-engine.js?v=28",
-  "./js/thousand-ui.js": "./js/thousand-ui.js?v=28",
-  "./js/spy-engine.js": "./js/spy-engine.js?v=28",
-  "./js/spy-ui.js": "./js/spy-ui.js?v=28",
-  "./js/spy-data.js": "./js/spy-data.js?v=28",
-  "./js/goat-engine.js": "./js/goat-engine.js?v=28",
-  "./js/goat-ui.js": "./js/goat-ui.js?v=28",
-  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=28",
-  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=28"
+  "./js/common.js": "./js/common.js?v=29",
+  "./js/host.js": "./js/host.js?v=29",
+  "./js/durak-engine.js": "./js/durak-engine.js?v=29",
+  "./js/durak-ui.js": "./js/durak-ui.js?v=29",
+  "./js/battle-engine.js": "./js/battle-engine.js?v=29",
+  "./js/battle-ui.js": "./js/battle-ui.js?v=29",
+  "./js/mafia-engine.js": "./js/mafia-engine.js?v=29",
+  "./js/mafia-ui.js": "./js/mafia-ui.js?v=29",
+  "./js/thousand-engine.js": "./js/thousand-engine.js?v=29",
+  "./js/thousand-ui.js": "./js/thousand-ui.js?v=29",
+  "./js/spy-engine.js": "./js/spy-engine.js?v=29",
+  "./js/spy-ui.js": "./js/spy-ui.js?v=29",
+  "./js/spy-data.js": "./js/spy-data.js?v=29",
+  "./js/goat-engine.js": "./js/goat-engine.js?v=29",
+  "./js/goat-ui.js": "./js/goat-ui.js?v=29",
+  "./js/rpoker-engine.js": "./js/rpoker-engine.js?v=29",
+  "./js/rpoker-ui.js": "./js/rpoker-ui.js?v=29"
 } }
 </script>
-<script type="module" src="js/app.js?v=28"></script>
+<script type="module" src="js/app.js?v=29"></script>
 </body>
 </html>

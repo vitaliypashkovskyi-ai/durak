@@ -3,6 +3,7 @@
 // small pieces EN_SUBS). A MutationObserver translates whatever the app draws later, so the game code
 // keeps writing Ukrainian. Not translated text simply stays Ukrainian.
 import { EN_EXACT, EN_RULES, EN_SUBS, EN_TITLES } from './i18n-en.js';
+import { RULES_HTML } from './i18n-en-games.js';
 
 const tg = window.Telegram && window.Telegram.WebApp;
 function detect() {
@@ -14,22 +15,37 @@ export const LANG = detect();
 export const setLang = l => { try { localStorage.setItem('games.lang', JSON.stringify(l)); } catch (e) {} location.reload(); };
 export const isEN = LANG === 'en';
 
-const x = s => (EN_EXACT[s] != null ? EN_EXACT[s] : s);
+// one piece: whole line, then patterns (a pattern may return null = "not mine, go on")
+function one(k) {
+  if (EN_EXACT[k] != null) return EN_EXACT[k];
+  for (const [re, rep] of EN_RULES) {
+    const m = k.match(re);
+    if (!m || m.slice(1).some(g => g && g.includes(' · '))) continue;   // glued pieces are split below
+    const out = typeof rep === 'function' ? rep(x, ...m.slice(1)) : k.replace(re, rep);
+    if (out != null) return out;
+  }
+  return null;
+}
+const x = s => { const t = one(s); return t == null ? subs(s) : t; };
+const subs = s => {
+  for (const [a, b] of EN_SUBS) {
+    if (a instanceof RegExp) s = s.replace(a, b);
+    else if (s.includes(a)) s = s.split(a).join(b);
+  }
+  return s;
+};
 export function tr(s) {
   if (!isEN || !s || !/[А-Яа-яІіЇїЄєҐґ]/.test(s)) return s;
   return s.split('\n').map(line => {
     const lead = line.match(/^\s*/)[0], tail = line.match(/\s*$/)[0], k = line.trim();
     if (!k) return line;
-    if (EN_EXACT[k] != null) return lead + EN_EXACT[k] + tail;
-    for (const [re, rep] of EN_RULES) {
-      const m = k.match(re);
-      if (m) return lead + (typeof rep === 'function' ? rep(x, ...m.slice(1)) : k.replace(re, rep)) + tail;
-    }
-    let out = k;
-    for (const [a, b] of EN_SUBS) if (out.includes(a)) out = out.split(a).join(b);
-    return lead + out + tail;
+    let t = one(k);
+    // a line glued from pieces «a · b · c»: translate each piece on its own
+    if (t == null && k.includes(' · ')) t = k.split(' · ').map(p => { const q = one(p); return q == null ? subs(p) : q; }).join(' · ');
+    return lead + subs(t == null ? k : t) + tail;               // subs also catch names left inside a pattern
   }).join('\n');
 }
+export const rulesOf = (id, uk) => (isEN && RULES_HTML[id] ? RULES_HTML[id] : uk);
 export const titleOf = (id, uk) => (isEN && EN_TITLES[id] ? EN_TITLES[id] : uk);
 
 const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT']);

@@ -39,7 +39,7 @@ import * as spiderUI from './spider-ui.js';
 import { SHOP } from './shop.js';
 import { LEVELS, HARD_GAMES, NO_LEVEL, levelOf } from './level.js';
 import { Host } from './host.js';
-import { LANG, setLang, startTranslating } from './i18n.js';
+import { LANG, setLang, startTranslating, rulesOf } from './i18n.js';
 startTranslating();
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -438,7 +438,7 @@ function showTip(game) {
 function showRules(game, back) {
   const body = document.createElement('div');
   body.className = 'rules';
-  body.innerHTML = GAMES[game].UI.rules;
+  body.innerHTML = rulesOf(game, GAMES[game].UI.rules);
   showPanel({ kind: 'rules', title: `${GAMES[game].title}: правила`, body, buttons: [{ text: 'Зрозуміло', fn: back || hidePanel }] });
 }
 

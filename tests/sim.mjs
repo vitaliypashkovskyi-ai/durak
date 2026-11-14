@@ -7,6 +7,9 @@ import * as spy from '../js/spy-engine.js';
 import * as goat from '../js/goat-engine.js';
 import * as rpoker from '../js/rpoker-engine.js';
 import * as svara from '../js/svara-engine.js';
+import * as checkers from '../js/checkers-engine.js';
+import * as nardy from '../js/nardy-engine.js';
+import * as dice from '../js/dice-engine.js';
 
 function run(E, cfg, n, games, check) {
   const res = { games: 0, steps: 0, transfers: 0, outcomes: {} };
@@ -156,6 +159,29 @@ for (let n = 5; n <= 12; n++) {
     };
     const r = run(svara, { length }, n, 40, check);
     console.log(`svara ${length} n=${n}: ${(hands / r.games).toFixed(1)} hands/game, show ${shows} fold ${folds} svara ${svaras}, max pot ${maxPot}`, 'winners', r.outcomes);
+  }
+}
+{
+  const r = run(checkers, {}, 2, 6, G => {
+    const n = [0, 1].map(i => G.B.filter(v => checkers.owner(v) === i).length);
+    if (n[0] > 12 || n[1] > 12) throw new Error('checkers count');
+  });
+  console.log('checkers: results', r.outcomes, 'avg plies', Math.round(r.steps / r.games));
+}
+{
+  let mars = 0;
+  const r = run(nardy, {}, 2, 30, G => {
+    const pts = Array(24).fill(-1);
+    for (let s = 0; s < 2; s++) for (const p of G.pos[s]) if (p < 24) { const x = nardy.absOf(s, p); if (pts[x] === 1 - s) throw new Error('nardy shared point'); pts[x] = s; }
+    if (G.over && G.mars && !G.__m) { G.__m = 1; mars++; }
+  });
+  console.log('nardy: winners', r.outcomes, 'avg steps', Math.round(r.steps / r.games), 'mars', mars);
+}
+{
+  for (const n of [2, 4, 6]) {
+    const tot = [];
+    const r = run(dice, {}, n, 10, G => { if (G.over && !G.__t) { G.__t = 1; G.sheets.forEach(s => tot.push(dice.totals(s).all)); } });
+    console.log(`dice n=${n}: avg score ${Math.round(tot.reduce((a, b) => a + b, 0) / tot.length)}`, 'winners', r.outcomes);
   }
 }
 console.log('OK');

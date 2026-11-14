@@ -3,9 +3,9 @@
 import { tg, CHANNEL, topText, esc } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
-const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w' };
+const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w', checkers: 'checkers_w', nardy: 'nardy_w', dice: 'dice_w' };
 const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'best_streak', 'last_day', 'rpoker_w',
-  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3'];
+  'welcome_done', 'ref_by', 'refs', 'ref_day', 'ref_today', 'svara_w', 'cup1', 'cup2', 'cup3', 'checkers_w', 'nardy_w', 'dice_w'];
 const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
@@ -38,6 +38,9 @@ const ACHIEVEMENTS = [
   ['🐐', 'Не козел', '5 перемог у Козлі', p => p.goat_w, 5],
   ['🎯', 'Снайпер', '5 перемог у Розписному покері', p => p.rpoker_w, 5],
   ['🎴', 'Сварщик', '5 перемог у Сварі', p => p.svara_w, 5],
+  ['⚪', 'Гросмейстер', '10 перемог у Шашках', p => p.checkers_w, 10],
+  ['🎲', 'Нардист', '10 перемог у Нардах', p => p.nardy_w, 10],
+  ['⚀', 'Щасливчик', '5 перемог у Костях', p => p.dice_w, 5],
   ['⚓', 'Адмірал', '15 перемог у Морському бої', p => p.battle_w, 15],
   ['🎭', 'Дон мафії', '5 перемог за мафію', p => p.don_w, 5],
   ['🏙', 'Захисник міста', '15 перемог за місто в Мафії', p => p.mafia_w - p.don_w, 15],
@@ -47,7 +50,7 @@ const ACHIEVEMENTS = [
   ['🏆', 'Чемпіон тижня', 'Виграйте турнір тижня', p => p.cup1, 1],
   ['🏅', 'Призер', '3 рази потрапте в трійку турніру', p => (p.cup1 || 0) + (p.cup2 || 0) + (p.cup3 || 0), 3],
   ['🌈', 'Майстер на всі руки', 'Виграйте в кожну гру хоча б раз',
-    p => ['durak_w', 'thousand_w', 'goat_w', 'battle_w', 'mafia_w', 'spy_w', 'rpoker_w', 'svara_w'].filter(c => p[c] > 0).length, 8],
+    p => ['durak_w', 'thousand_w', 'goat_w', 'battle_w', 'mafia_w', 'spy_w', 'rpoker_w', 'svara_w', 'checkers_w', 'nardy_w', 'dice_w'].filter(c => p[c] > 0).length, 11],
 ];
 export function achievements(p) {
   return ACHIEVEMENTS.map(([icon, name, how, f, goal]) => {

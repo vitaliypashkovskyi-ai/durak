@@ -12,14 +12,17 @@ import * as spy from '../../js/spy-engine.js';
 import * as goat from '../../js/goat-engine.js';
 import * as rpoker from '../../js/rpoker-engine.js';
 import * as svara from '../../js/svara-engine.js';
+import * as checkers from '../../js/checkers-engine.js';
+import * as nardy from '../../js/nardy-engine.js';
+import * as dice from '../../js/dice-engine.js';
 import { Host } from '../../js/host.js';
 import { tg, handleUpdate, statsCall, joinUrl, cfgLabel, esc, GAMES } from './telegram.js';
 export { Stats } from './stats.js';
 
-const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara };
-const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2 };
-const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8 };   // durak, rpoker: depend on the deck
-const NO_RANDOM = new Set(['mafia', 'thousand', 'spy', 'goat', 'rpoker', 'svara']);
+const ENGINES = { durak, battle, mafia, thousand, spy, goat, rpoker, svara, checkers, nardy, dice };
+const MIN = { durak: 2, battle: 2, mafia: 5, thousand: 3, spy: 3, goat: 4, rpoker: 2, svara: 2, checkers: 2, nardy: 2, dice: 2 };
+const MAX = { durak: 6, battle: 4, mafia: 12, thousand: 3, spy: 10, goat: 4, rpoker: 8, svara: 8, checkers: 2, nardy: 2, dice: 6 };   // durak, rpoker: depend on the deck
+const NO_RANDOM = new Set(['mafia', 'thousand', 'spy', 'goat', 'rpoker', 'svara', 'dice']);
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
 const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
@@ -409,7 +412,9 @@ export class Room {
         const team = G.roles[i] === 'mafia' ? 'mafia' : 'town';
         res = G.winner === team ? 'win' : 'lose';
         don = team === 'mafia';
-      } else if (G.game === 'rpoker' || G.game === 'svara') {
+      } else if (G.game === 'checkers' || G.game === 'nardy') {
+        res = G.winner === -1 ? 'draw' : G.winner === i ? 'win' : 'lose';
+      } else if (G.game === 'rpoker' || G.game === 'svara' || G.game === 'dice') {
         res = G.winners.includes(i) ? (G.winners.length > 1 ? 'draw' : 'win') : 'lose';
       } else if (G.game === 'goat') {
         res = G.winner === i % 2 ? 'win' : 'lose';

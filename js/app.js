@@ -16,6 +16,12 @@ import * as rpokerE from './rpoker-engine.js';
 import * as rpokerUI from './rpoker-ui.js';
 import * as svaraE from './svara-engine.js';
 import * as svaraUI from './svara-ui.js';
+import * as checkersE from './checkers-engine.js';
+import * as checkersUI from './checkers-ui.js';
+import * as nardyE from './nardy-engine.js';
+import * as nardyUI from './nardy-ui.js';
+import * as diceE from './dice-engine.js';
+import * as diceUI from './dice-ui.js';
 import { Host } from './host.js';
 
 const SERVER = 'wss://durak.durak-server.workers.dev';
@@ -35,7 +41,10 @@ GAMES.spy = { title: 'Шпигун', icon: '🕵️', sub: '3–10 гравці�
 GAMES.goat = { title: 'Козел', icon: '🐐', sub: '4 гравці, 2 на 2', E: goatE, UI: goatUI, minP: 4, maxP: 4, noRandom: true };
 GAMES.rpoker = { title: 'Розписний покер', icon: '🎯', sub: '2–8 гравців', E: rpokerE, UI: rpokerUI, minP: 2, maxP: 8, defP: 4, noRandom: true };
 GAMES.svara = { title: 'Свара', icon: '🎴', sub: '2–8 гравців', E: svaraE, UI: svaraUI, minP: 2, maxP: 8, defP: 4, noRandom: true };
-const SOON = [['⚪', 'Шашки'], ['🎲', 'Нарди'], ['⚀', 'Кості']];
+GAMES.checkers = { title: 'Шашки', icon: '⚪', sub: '2 гравці', E: checkersE, UI: checkersUI, minP: 2, maxP: 2 };
+GAMES.nardy = { title: 'Нарди', icon: '🎲', sub: '2 гравці, довгі', E: nardyE, UI: nardyUI, minP: 2, maxP: 2 };
+GAMES.dice = { title: 'Кості', icon: '⚀', sub: '2–6 гравців, покер на костях', E: diceE, UI: diceUI, minP: 2, maxP: 6, defP: 3, noRandom: true };
+const SOON = [];
 
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 
@@ -124,7 +133,7 @@ function stat(game) {
   return s && typeof s.win === 'number' ? s : { win: 0, lose: 0, draw: 0 };
 }
 function addStat(game, res) { const s = stat(game); s[res] = (s[res] || 0) + 1; setPref('stats.' + game, s); }
-const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍', goat: '🐐', rpoker: '💸', svara: '💸' };
+const LOSE_ICON = { durak: '🙃', battle: '⚓', mafia: '💀', thousand: '📉', spy: '🔍', goat: '🐐', rpoker: '💸', svara: '💸', checkers: '⚫', nardy: '🎲', dice: '🎲' };
 function updStats(game) { const s = stat(game); $('stats').textContent = `🏆 ${s.win} · ${LOSE_ICON[game] || '✖'} ${s.lose}`; }
 
 // ---------- session ----------

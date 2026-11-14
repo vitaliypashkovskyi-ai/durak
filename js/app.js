@@ -1014,11 +1014,19 @@ async function shareCard({ text, url, button }) {
     const u = 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text);
     if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, '_blank');
   };
-  if (!inTelegram || !tg.shareMessage || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return fallback();
+  // the card works reliably in the phone apps; desktop and web Telegram get the plain share window
+  const phone = inTelegram && ['android', 'ios'].includes(tg.platform);
+  if (!phone || !tg.shareMessage || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return fallback();
+  toast('Відкриваю…');
   try {
-    const r = await (await fetch(`${httpBase()}/api/share`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), text, url, button }) })).json();
+    const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 6000);
+    const r = await (await fetch(`${httpBase()}/api/share`, { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), text, url, button }) })).json();
+    clearTimeout(timer);
     if (!r.id) return fallback();
-    tg.shareMessage(r.id, sent => { if (sent) { toast('Надіслано 👍'); haptic('success'); } });
+    // Telegram reports a failure by an event; anything but «the user closed it» → the plain window
+    const onFail = e => { tg.offEvent('shareMessageFailed', onFail); if (!e || e.error !== 'USER_DECLINED') fallback(); };
+    tg.onEvent('shareMessageFailed', onFail);
+    tg.shareMessage(r.id, sent => { tg.offEvent('shareMessageFailed', onFail); if (sent) { toast('Надіслано 👍'); haptic('success'); } });
   } catch (e) { fallback(); }
 }
 const myLink = () => (myTgId() ? personalLink() : APP_LINK);

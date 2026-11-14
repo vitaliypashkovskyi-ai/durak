@@ -268,6 +268,14 @@ function showHub() {
   inviteBtn.textContent = '👥 Запросити друзів · +15 за кожного';
   inviteBtn.onclick = showInviteFriends;
   top.appendChild(inviteBtn);
+  if (signedIn) {
+    const rowF = document.createElement('div');
+    rowF.className = 'hubrow';
+    const fb = document.createElement('button'); fb.className = 'hubact'; fb.textContent = '👫 Друзі'; fb.onclick = () => showFriends(null);
+    const qb = document.createElement('button'); qb.className = 'hubact'; qb.textContent = '📋 Завдання дня'; qb.onclick = showQuests;
+    rowF.append(fb, qb);
+    top.appendChild(rowF);
+  }
   const open = url => { if (inTelegram && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, '_blank'); };
   const row = document.createElement('div');
   row.className = 'hubrow';
@@ -530,11 +538,16 @@ function onView(v) {
 
 function showResult(v) {
   const r = GAMES[v.game].UI.result(v);
+  if (S.kind === 'online' && signedIn && S.questNum !== v.num) { S.questNum = v.num; setTimeout(checkQuests, 2500); }
   let text = r.text || '';
   const buttons = [];
   if (S.kind === 'local') {
     const { game, cfg, n } = S;
-    if (!S.counted) { S.counted = true; fetch(`${httpBase()}/api/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: 'bot', game }) }).catch(() => {}); }
+    if (!S.counted) {
+      S.counted = true;
+      fetch(`${httpBase()}/api/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: 'bot', game, res: r.res, init: signedIn ? AUTH() : '' }) })
+        .then(x => x.json()).then(x => questToasts(x.done)).catch(() => {});
+    }
     buttons.push({ text: 'Ще раз', fn: () => startLocal(game, cfg, n) });
   } else {
     const me = v.seat, mine = v.again && v.again[me];
@@ -567,7 +580,7 @@ async function claimDaily() {
   setPref('dailyDay', new Date().toLocaleDateString('en-CA'));
   document.querySelectorAll('.hubact.gift').forEach(b => b.classList.remove('gift'));
   const fire = '🔥'.repeat(Math.min(r.streak, 7));
-  if (r.claimed) { sfx('win'); haptic('success'); }
+  if (r.claimed) { sfx('win'); haptic('success'); setTimeout(() => questToasts(r.quests), 1800); }
   showPanel({
     kind: 'daily', icon: r.claimed ? '🎁' : '⏳', title: r.claimed ? `+${r.bonus} очок!` : 'Сьогодні вже отримано',
     text: `Серія: ${r.streak} ${r.streak === 1 ? 'день' : r.streak < 5 ? 'дні' : 'днів'} ${fire}\n` +
@@ -754,7 +767,7 @@ function onRoomMsg(m) {
     return showPanel({ kind: 'error', icon: '😕', title: 'Не вийшло', text: m.text, buttons: [{ text: 'Меню ігор', fn: showHub }] });
   }
   if (m.type === 'lobby' || m.type === 'state') setPref('lastRoom', { code: S.code, game: m.game, t: Date.now() });
-  if (m.type === 'lobby') { S.game = m.game; S.lobby = m; return showLobby(m); }
+  if (m.type === 'lobby') { S.game = m.game; S.lobby = m; if (S.callFriend) { const f = S.callFriend; S.callFriend = null; callFriend(f, m.game); } return showLobby(m); }
   if (m.type !== 'state') return;
   if (!S.mounted || S.game !== m.game) { S.game = m.game; S.mounted = true; openGame(m.game); }
   if (['lobby', 'connect'].includes(panelKind())) hidePanel();
@@ -782,6 +795,7 @@ function showLobby(m) {
   }
   body.appendChild(ul);
   const buttons = [
+    ...(signedIn ? [{ text: '👫 Покликати друга', fn: () => showFriends(m.game) }] : []),
     { text: '📨 Запросити в Telegram', fn: shareInvite },
     { text: '📋 Скопіювати посилання', sec: true, fn: copyInvite },
   ];
@@ -812,6 +826,100 @@ function inviteLink() {
   return `${location.origin}${location.pathname}?room=${S.code}&server=${encodeURIComponent(serverBase())}`;
 }
 const personalLink = () => `${APP_LINK}?startapp=r${myTgId()}`;
+
+// ---------- friends: people you invited or played with; call them into a room ----------
+const post = (path, body) => fetch(`${httpBase()}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ init: AUTH() }, body)) }).then(r => r.json());
+function ago(ts) {
+  if (!ts) return '';
+  const m = Math.floor((Date.now() - ts) / 60000);
+  return m < 60 ? `${Math.max(1, m)} хв тому` : m < 1440 ? `${Math.floor(m / 60)} год тому` : `${Math.floor(m / 1440)} дн тому`;
+}
+// game = null: from the menu (pick a game, a room is created); game set: from a lobby (call into this room)
+async function showFriends(game) {
+  const back = game ? () => showLobby(S.lobby) : hidePanel;
+  showPanel({ kind: 'friends', icon: '👫', title: 'Друзі', text: 'Завантаження…', buttons: [{ text: 'Назад', sec: true, fn: back }] });
+  let list = [];
+  try { list = await post('/api/friends', {}); } catch (e) {}
+  if (panelKind() !== 'friends') return;
+  const body = document.createElement('div');
+  if (!Array.isArray(list) || !list.length) {
+    const p = document.createElement('p'); p.className = 'muted';
+    p.textContent = 'Тут з\'являться ті, хто прийшов за вашим посиланням, і ті, з ким ви грали онлайн.';
+    body.appendChild(p);
+  } else {
+    const ul = document.createElement('ul'); ul.className = 'plist friends';
+    list.forEach(f => {
+      const li = document.createElement('li');
+      const n = document.createElement('span');
+      n.textContent = `${f.online ? '🟢' : '⚪'} ${f.name}` + (f.online ? ' · онлайн' : f.seen ? ` · ${ago(f.seen)}` : '') + (f.games ? ` · ігор разом: ${f.games}` : '');
+      li.appendChild(n);
+      const b = document.createElement('button');
+      b.textContent = '📣 Покликати';
+      b.disabled = !f.pm;
+      if (!f.pm) b.title = 'Друг ще не дозволив боту писати';
+      b.onclick = () => (game ? callFriend(f, game) : pickGameFor(f));
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+    body.appendChild(ul);
+  }
+  showPanel({ kind: 'friends', icon: '👫', title: 'Друзі', body, buttons: [
+    { text: '👥 Запросити нових · +15', sec: true, fn: showInviteFriends }, { text: 'Назад', sec: true, fn: back }] });
+}
+function pickGameFor(f) {
+  const body = document.createElement('div'); body.className = 'chips';
+  Object.entries(GAMES).forEach(([id, g]) => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = `${g.icon} ${g.title}`;
+    b.onclick = () => { joinRoom(genCode(), { game: id }); S.callFriend = f; };
+    body.appendChild(b);
+  });
+  showPanel({ kind: 'friends', icon: '📣', title: `У що покликати ${f.name}?`, text: 'Створимо кімнату, і бот надішле другові кнопку «Приєднатися».', body, buttons: [{ text: 'Назад', sec: true, fn: () => showFriends(null) }] });
+}
+async function callFriend(f, game) {
+  if (!S || !S.code) return;
+  try {
+    const r = await post('/api/invite', { to: f.id, code: S.code, game });
+    if (r.ok) { toast(`📣 ${f.name} отримав запрошення`); haptic('success'); }
+    else toast(r.why === 'too often' ? 'Ви вже кликали — зачекайте 2 хвилини' : r.why === 'no pm' ? `${f.name} ще не дозволив боту писати — надішліть посилання` : 'Не вдалося покликати');
+  } catch (e) { toast('Не вдалося покликати'); }
+  if (S && S.lobby && panelKind() === 'friends') showLobby(S.lobby);
+}
+
+// ---------- daily quests ----------
+function questToasts(done) {
+  (done || []).forEach((q, i) => setTimeout(() => { sfx('chime'); toast(q.all ? `🎉 Усі завдання дня! +${q.pts}` : `✅ ${q.text}: +${q.pts}`); }, i * 2200));
+}
+async function checkQuests() {
+  try {
+    const r = await post('/api/quests', {});
+    const key = 'questsDone.' + new Date().toDateString();
+    const before = pref(key, 0), now = r.list.filter(q => q.done).length;
+    if (now > before) { questToasts(r.list.filter(q => q.done).slice(before).map(q => ({ text: q.text, pts: r.reward })).concat(now === r.list.length ? [{ all: true, pts: r.all }] : [])); }
+    setPref(key, now);
+  } catch (e) {}
+}
+async function showQuests() {
+  showPanel({ kind: 'quests', icon: '📋', title: 'Завдання дня', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  let r = null;
+  try { r = await post('/api/quests', {}); } catch (e) {}
+  if (panelKind() !== 'quests') return;
+  if (!r || !r.list) return showPanel({ kind: 'quests', icon: '📋', title: 'Завдання дня', text: 'Не вдалося завантажити.', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  setPref('questsDone.' + new Date().toDateString(), r.list.filter(q => q.done).length);
+  const body = document.createElement('div');
+  r.list.forEach(q => {
+    const d = document.createElement('div'); d.className = 'quest' + (q.done ? ' done' : '');
+    const t = document.createElement('div'); t.textContent = (q.done ? '✅ ' : '⬜ ') + q.text;
+    const bar = document.createElement('div'); bar.className = 'qbar';
+    const fill = document.createElement('span'); fill.style.width = `${Math.round(100 * q.prog / q.need)}%`; bar.appendChild(fill);
+    const s = document.createElement('small'); s.textContent = q.done ? `виконано · +${r.reward}` : `${q.prog} з ${q.need} · нагорода +${r.reward}`;
+    d.append(t, bar, s);
+    body.appendChild(d);
+  });
+  const all = document.createElement('p'); all.className = 'muted';
+  all.textContent = `За всі три — ще +${r.all}. Нові завдання щодня опівночі (за Києвом).`;
+  body.appendChild(all);
+  showPanel({ kind: 'quests', icon: '📋', title: 'Завдання дня', body, buttons: [{ text: 'Грати!', fn: hidePanel }] });
+}
 
 function showInviteFriends() {
   if (!signedIn || !myTgId()) {
@@ -902,6 +1010,15 @@ REACTIONS.forEach(e => {
   b.onclick = () => { netSend({ t: 'react', e }); $('reactBar').hidden = true; };
   $('reactBar').appendChild(b);
 });
+// ready-made phrases (the server checks only the number; order must stay the same)
+const PHRASES = ['Добра гра! 🤝', 'Ну ти даєш 😅', 'Ще партію?', 'Удачі! 🍀', 'Дякую!', 'Ой-ой 🙈', 'Думаю… 🤔', 'Ходи вже 😴'];
+PHRASES.forEach((t, p) => {
+  const b = document.createElement('button');
+  b.className = 'phr';
+  b.textContent = t;
+  b.onclick = () => { netSend({ t: 'react', p }); $('reactBar').hidden = true; };
+  $('reactBar').appendChild(b);
+});
 $('reactBtn').onclick = () => { $('reactBar').hidden = !$('reactBar').hidden; };
 function showReact(m) {
   const v = lastView;
@@ -911,7 +1028,7 @@ function showReact(m) {
   const d = document.createElement('div');
   d.className = 'rx';
   d.textContent = name;
-  const b = document.createElement('b'); b.textContent = m.e; d.appendChild(b);
+  const b = document.createElement('b'); b.textContent = m.p != null ? ' ' + (PHRASES[m.p] || '') : m.e; if (m.p != null) b.className = 'ph'; d.appendChild(b);
   $('reacts').appendChild(d);
   setTimeout(() => d.remove(), 2700);
   sfx('pop');

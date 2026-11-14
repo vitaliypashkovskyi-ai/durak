@@ -1,6 +1,6 @@
 // Stats: one Durable Object (SQLite) with players' points, results for the weekly top,
 // and a cached lookup of the news channel and the players' chat linked to it.
-import { tg, CHANNEL, topText, esc, APP_URL } from './telegram.js';
+import { tg, CHANNEL, topText, esc, APP_URL, GAMES } from './telegram.js';
 
 const PTS = { win: 3, draw: 1, lose: 0 };
 const GAME_COL = { durak: 'durak_w', battle: 'battle_w', mafia: 'mafia_w', thousand: 'thousand_w', spy: 'spy_w', goat: 'goat_w', rpoker: 'rpoker_w', svara: 'svara_w', checkers: 'checkers_w', nardy: 'nardy_w', dice: 'dice_w' };
@@ -10,6 +10,29 @@ const EXTRA_COLS = ['thousand_w', 'spy_w', 'spyrole_w', 'goat_w', 'streak', 'bes
 const WELCOME = 10, REF_FRIEND = 5, REF_INVITER = 15, REF_PER_DAY = Infinity;   // no daily cap (user's choice)
 const LEVELS = [[0, 'Новачок 🌱'], [15, 'Аматор 🙂'], [40, 'Гравець 🎯'], [90, 'Досвідчений 💪'], [180, 'Майстер 🏅'], [350, 'Легенда 👑']];
 const WEEK = 7 * 86400 * 1000;
+// Daily quests: the same three for everyone each day; +QUEST_PTS each, +QUEST_ALL more for all three.
+const QUEST_PTS = 5, QUEST_ALL = 5;
+const QUEST_GAMES = ['durak', 'rpoker', 'svara', 'thousand', 'goat', 'battle', 'checkers', 'nardy', 'dice', 'spy', 'mafia'];
+const gname = g => (GAMES[g] ? `${GAMES[g].icon} ${GAMES[g].title}` : g);
+export function questsFor(day) {
+  const g = QUEST_GAMES[day % QUEST_GAMES.length], h = QUEST_GAMES[(day * 7 + 3) % QUEST_GAMES.length];
+  const a = day % 2 ? { k: 'bonus', n: 1, text: 'Заберіть 🎁 бонус дня' } : { k: 'play_any', n: 3, text: 'Зіграйте 3 будь-які партії (з ботами чи людьми)' };
+  const b = day % 3 === 0 ? { k: 'play_game', g: h, n: 2, text: `Зіграйте 2 партії в ${gname(h)}` } : { k: 'win_game', g, n: 1, text: `Виграйте партію в ${gname(g)}` };
+  const c = day % 2 ? { k: 'play_online', n: 2, text: 'Зіграйте 2 онлайн-партії з людьми' } : { k: 'win_online', n: 1, text: 'Виграйте онлайн-партію з людьми' };
+  return [a, b, c];
+}
+// does an event {online, game, win, bonus} count for the quest q?
+function questHit(q, e) {
+  switch (q.k) {
+    case 'bonus': return !!e.bonus;
+    case 'play_any': return !!e.game;
+    case 'play_online': return !!e.game && e.online;
+    case 'win_online': return !!e.game && e.online && e.win;
+    case 'play_game': return e.game === q.g;
+    case 'win_game': return e.game === q.g && e.win;
+  }
+  return false;
+}
 // Weekly tournament: from Sunday 17:00 UTC (the cron) to the next one. Top-3 get bonus points and a cup.
 export const PRIZES = [30, 20, 10];
 const TOUR_HOUR = 17;   // UTC, same as the cron in wrangler.toml
@@ -83,6 +106,9 @@ export class Stats {
     this.sql.exec('CREATE INDEX IF NOT EXISTS results_ts ON results(ts)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS purchases(id TEXT, item TEXT, stars INTEGER, charge TEXT PRIMARY KEY, ts INTEGER)');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS friends(a TEXT, b TEXT, ts INTEGER, games INTEGER DEFAULT 0, PRIMARY KEY(a, b))');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS quests(id TEXT, day INTEGER, qi INTEGER, prog INTEGER DEFAULT 0, done INTEGER DEFAULT 0, PRIMARY KEY(id, day, qi))');
+    this.invited = new Map();   // 'a>b' -> last invite time (anti-spam)
     this.seen = new Map();   // who has the app open now (in memory): id -> last ping
   }
 
@@ -98,7 +124,14 @@ export class Stats {
     if (url.pathname === '/weekly') return json(await this.weekly());
     if (url.pathname === '/tour') return json(this.tour(url.searchParams.get('id')));
     if (url.pathname === '/ping') return json(this.ping(body.id));
-    if (url.pathname === '/event') { this.count(`${body.t}:${body.game}`); return json({ ok: true }); }
+    if (url.pathname === '/event') {
+      this.count(`${body.t}:${body.game}`);
+      const done = body.id ? this.questEvent(body.id, { game: body.game, win: !!body.win, online: false }) : [];
+      return json({ ok: true, done });
+    }
+    if (url.pathname === '/friends') return json(this.friends(body.id));
+    if (url.pathname === '/invite') return json(this.canInvite(body.from, body.to));
+    if (url.pathname === '/quests') return json(this.quests(body.id));
     if (url.pathname === '/admin') return json(this.admin());
     if (url.pathname === '/buy') return json(this.buy(body));
     if (url.pathname === '/notify') return json(this.notify(body));
@@ -121,7 +154,11 @@ export class Stats {
         don_w = don_w + ?, spyrole_w = spyrole_w + ? WHERE id = ?`,
       pts, win, win, game === 'mafia' ? special : 0, game === 'spy' ? special : 0, p.id);
       this.sql.exec('INSERT INTO results(id, game, res, pts, ts) VALUES(?, ?, ?, ?, ?)', p.id, game, p.res, pts, now);
+      this.questEvent(p.id, { game, online: true, win: p.res === 'win' });
     }
+    // people who played together become friends
+    const ids = players.map(p => p.id).filter(id => /^tg:\d+$/.test(id));
+    for (const a of ids) for (const b of ids) if (a < b) this.befriend(a, b, true);
     this.sql.exec('DELETE FROM results WHERE ts < ?', now - 5 * WEEK);
   }
 
@@ -161,6 +198,7 @@ export class Stats {
         this.sql.exec('UPDATE players SET ref_by = ? WHERE id = ?', refId, id);
         bonus += REF_FRIEND;
         inviter = { id: refId, name: inv.name };
+        this.befriend(id, refId, false);
       }
     }
     this.sql.exec('UPDATE players SET points = points + ?, welcome_done = 1 WHERE id = ?', bonus, id);
@@ -178,7 +216,8 @@ export class Stats {
     const bonus = dailyBonus(streak);
     this.sql.exec('UPDATE players SET points = points + ?, streak = ?, best_streak = MAX(best_streak, ?), last_day = ? WHERE id = ?',
       bonus, streak, streak, today, id);
-    return { ok: true, claimed: true, bonus, streak, next: dailyBonus(streak + 1), points: p.points + bonus };
+    const quests = this.questEvent(id, { bonus: true });
+    return { ok: true, claimed: true, bonus, streak, next: dailyBonus(streak + 1), points: p.points + bonus, quests };
   }
 
   // ---------- counters per Kyiv day (kv 'c:<day>' = {key: n}) and the owner's summary ----------
@@ -210,6 +249,64 @@ export class Stats {
         week: one('SELECT COALESCE(SUM(stars), 0) AS n FROM purchases WHERE ts > ?', now - WEEK),
         all: one('SELECT COALESCE(SUM(stars), 0) AS n FROM purchases'), buyers: one('SELECT COUNT(DISTINCT id) AS n FROM purchases'),
         vips: one('SELECT COUNT(*) AS n FROM players WHERE vip_until > ?', now) },
+    };
+  }
+
+  // ---------- friends ----------
+  befriend(a, b, played) {
+    if (a === b) return;
+    const now = Date.now();
+    for (const [x, y] of [[a, b], [b, a]]) {
+      this.sql.exec('INSERT INTO friends(a, b, ts, games) VALUES(?, ?, ?, ?) ON CONFLICT(a, b) DO UPDATE SET ts = excluded.ts, games = games + ?',
+        x, y, now, played ? 1 : 0, played ? 1 : 0);
+    }
+  }
+  friends(id) {
+    const now = Date.now();
+    const rows = this.sql.exec(`SELECT f.b AS id, p.name AS name, p.last_seen AS seen, f.games AS games, p.pm_ok AS pm
+      FROM friends f JOIN players p ON p.id = f.b WHERE f.a = ? ORDER BY p.last_seen DESC LIMIT 60`, String(id)).toArray();
+    return rows.map(r => {
+      const t = this.seen.get(r.id);
+      return { id: r.id, name: r.name, online: !!t && now - t < 150000, seen: r.seen || 0, games: r.games, pm: !!r.pm };
+    }).sort((x, y) => (y.online - x.online) || (y.seen - x.seen));
+  }
+  // may «from» call «to» into a game now? (friends, the bot may write, at most once per 2 minutes)
+  canInvite(from, to) {
+    const f = this.sql.exec('SELECT COUNT(*) AS n FROM friends WHERE a = ? AND b = ?', String(from), String(to)).one().n;
+    if (!f) return { ok: false, why: 'not friends' };
+    const p = this.sql.exec('SELECT pm_ok FROM players WHERE id = ?', String(to)).toArray()[0];
+    if (!p || !p.pm_ok) return { ok: false, why: 'no pm' };
+    const k = from + '>' + to, t = this.invited.get(k) || 0;
+    if (Date.now() - t < 120000) return { ok: false, why: 'too often' };
+    this.invited.set(k, Date.now());
+    return { ok: true };
+  }
+
+  // ---------- daily quests ----------
+  questEvent(id, e) {
+    if (!/^tg:\d+$/.test(String(id))) return [];
+    const day = kyivDay(), qs = questsFor(day), done = [];
+    qs.forEach((q, qi) => {
+      if (!questHit(q, e)) return;
+      this.sql.exec('INSERT INTO quests(id, day, qi) VALUES(?, ?, ?) ON CONFLICT DO NOTHING', id, day, qi);
+      const r = this.sql.exec('SELECT prog, done FROM quests WHERE id = ? AND day = ? AND qi = ?', id, day, qi).one();
+      if (r.done) return;
+      const prog = r.prog + 1, fin = prog >= q.n;
+      this.sql.exec('UPDATE quests SET prog = ?, done = ? WHERE id = ? AND day = ? AND qi = ?', prog, fin ? 1 : 0, id, day, qi);
+      if (fin) { this.sql.exec('UPDATE players SET points = points + ? WHERE id = ?', QUEST_PTS, id); done.push({ text: q.text, pts: QUEST_PTS }); }
+    });
+    if (done.length) {
+      const all = this.sql.exec('SELECT COUNT(*) AS n FROM quests WHERE id = ? AND day = ? AND done = 1', id, day).one().n;
+      if (all === qs.length) { this.sql.exec('UPDATE players SET points = points + ? WHERE id = ?', QUEST_ALL, id); done.push({ text: 'Усі завдання дня', pts: QUEST_ALL, all: true }); }
+    }
+    return done;
+  }
+  quests(id) {
+    const day = kyivDay(), qs = questsFor(day);
+    const rows = /^tg:\d+$/.test(String(id)) ? this.sql.exec('SELECT qi, prog, done FROM quests WHERE id = ? AND day = ?', id, day).toArray() : [];
+    return {
+      reward: QUEST_PTS, all: QUEST_ALL,
+      list: qs.map((q, qi) => { const r = rows.find(x => x.qi === qi) || { prog: 0, done: 0 }; return { text: q.text, need: q.n, prog: Math.min(r.prog, q.n), done: !!r.done }; }),
     };
   }
 

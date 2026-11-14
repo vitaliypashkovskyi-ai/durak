@@ -28,6 +28,7 @@ const TARGET = { durak: 2, battle: 2, checkers: 2, nardy: 2, thousand: 3, goat: 
 const MATCH_WAIT_MS = 25000;
 const NO_BOTS = new Set();   // games where the host may not add bots (none at the moment)
 const REACTIONS = new Set(['😂', '👏', '😮', '😡', '🤝', '🔥', '😭', '🤔']);
+const PHRASES = 8;   // ready-made table phrases, their texts live in the app (js/app.js PHRASES)
 const BOT_NAMES = ['Тарас', 'Оксана', 'Марко', 'Соломія', 'Богдан', 'Ірина', 'Остап', 'Дарина', 'Назар', 'Леся', 'Петро'];
 const IDLE_MS = 45000;       // a human who does not move for this long gets an automatic move
 const LEFT_MS = 60000;       // a human offline for this long is replaced by a bot
@@ -55,6 +56,24 @@ export default {
       return new Response('ok');
     }
     if (url.pathname === '/api/top') return json(await statsCall(env, '/top?period=' + (url.searchParams.get('period') === 'week' ? 'week' : 'all')));
+    if (['/api/friends', '/api/quests', '/api/invite'].includes(url.pathname) && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
+      if (url.pathname === '/api/friends') return json(await statsCall(env, '/friends', { id: user.id }));
+      if (url.pathname === '/api/quests') return json(await statsCall(env, '/quests', { id: user.id }));
+      // call a friend into a room: the bot writes to them with a «join» button
+      const code = String(body.code || '').toUpperCase(), game = GAMES[body.game] ? body.game : null;
+      if (!/^[A-Z0-9]{4,8}$/.test(code) || !game || !/^tg:\d+$/.test(String(body.to))) return json({ ok: false, why: 'bad' }, 400);
+      const can = await statsCall(env, '/invite', { from: user.id, to: body.to });
+      if (!can.ok) return json(can);
+      const r = await tg(env, 'sendMessage', {
+        chat_id: String(body.to).slice(3), parse_mode: 'HTML',
+        text: `👋 <b>${esc(user.name)}</b> кличе вас у гру ${GAMES[game].icon} <b>${GAMES[game].title}</b>! Кімната ${code}.`,
+        reply_markup: { inline_keyboard: [[{ text: '▶ Приєднатися', url: joinUrl(code) }]] },
+      }).catch(() => ({ ok: false }));
+      return json({ ok: !!r.ok, why: r.ok ? null : 'no pm' });
+    }
     if (url.pathname === '/api/shop' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);
@@ -64,8 +83,11 @@ export default {
     }
     if (url.pathname === '/api/event' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
-      if (body.t === 'bot' && ENGINES[body.game]) ctx.waitUntil(statsCall(env, '/event', { t: 'bot', game: body.game }));
-      return json({ ok: true });
+      if (body.t !== 'bot' || !ENGINES[body.game]) return json({ ok: true, done: [] });
+      // a signed-in player: the game counts for the daily quests too
+      const user = body.init ? await authenticate({ init: body.init }, env) : null;
+      const r = await statsCall(env, '/event', { t: 'bot', game: body.game, win: body.res === 'win', id: user && user.id.startsWith('tg:') ? user.id : null });
+      return json({ ok: true, done: r.done || [] });
     }
     if (url.pathname === '/api/ping' && req.method === 'POST') {
       // «🟢 N онлайн»: everyone with the app open pings once a minute
@@ -430,9 +452,11 @@ export class Room {
     if (m.t === 'advertise') return this.advertise(s);
     if (m.t === 'react') {
       // quick emoji reactions: shown to everyone at the table, at most one per second per player
-      if (!REACTIONS.has(m.e) || Date.now() - (s.lastReact || 0) < 1000) return;
+      const p = Number.isInteger(m.p) && m.p >= 0 && m.p < PHRASES ? m.p : null;
+      if ((p == null && !REACTIONS.has(m.e)) || Date.now() - (s.lastReact || 0) < 1000) return;
       s.lastReact = Date.now();
-      return this.seats.forEach(x => { if (x.ws) send(x.ws, { type: 'react', from: i, e: m.e }); });
+      const out = p == null ? { type: 'react', from: i, e: m.e } : { type: 'react', from: i, p };
+      return this.seats.forEach(x => { if (x.ws) send(x.ws, out); });
     }
     if (!this.G) {                   // lobby commands (host only)
       if (s.id !== this.hostId) return;

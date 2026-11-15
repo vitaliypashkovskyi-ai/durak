@@ -177,7 +177,9 @@ function draw() {
       who.textContent = (c.ch === 'mafia' ? '🔫 ' : '') + nm(c.from) + ': ';
       row.appendChild(who);
     }
-    row.appendChild(document.createTextNode(c.text));
+    // people's own words are never machine-translated; bots and the game are (class notr = leave as is)
+    const tx = document.createElement('span'); tx.textContent = c.text; if (c.from >= 0 && !v.players[c.from].bot) tx.className = 'notr';
+    row.appendChild(tx);
     chat.appendChild(row);
   });
   const newest = v.chat.length ? v.chat[v.chat.length - 1].id : 0;

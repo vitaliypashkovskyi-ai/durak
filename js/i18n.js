@@ -4,6 +4,7 @@
 // keeps writing Ukrainian. Not translated text simply stays Ukrainian.
 import { EN_EXACT, EN_RULES, EN_SUBS, EN_TITLES } from './i18n-en.js';
 import { RULES_HTML } from './i18n-en-games.js';
+import { RULES2_HTML } from './i18n-en-games2.js';
 
 const tg = window.Telegram && window.Telegram.WebApp;
 function detect() {
@@ -45,14 +46,14 @@ export function tr(s) {
     return lead + subs(t == null ? k : t) + tail;               // subs also catch names left inside a pattern
   }).join('\n');
 }
-export const rulesOf = (id, uk) => (isEN && RULES_HTML[id] ? RULES_HTML[id] : uk);
+export const rulesOf = (id, uk) => (isEN && (RULES_HTML[id] || RULES2_HTML[id])) || uk;
 export const titleOf = (id, uk) => (isEN && EN_TITLES[id] ? EN_TITLES[id] : uk);
 
 const SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT']);
 function walk(node) {
   if (node.nodeType === 3) {
     const p = node.parentNode;
-    if (p && SKIP.has(p.nodeName)) return;
+    if (p && (SKIP.has(p.nodeName) || p.classList && p.classList.contains('notr'))) return;
     const t = tr(node.nodeValue);
     if (t !== node.nodeValue) node.nodeValue = t;
     return;
@@ -72,7 +73,8 @@ export function startTranslating() {
   new MutationObserver(ms => {
     for (const m of ms) {
       if (m.type === 'characterData') walk(m.target);
+      else if (m.type === 'attributes') { const v = m.target.getAttribute(m.attributeName); const t = v && tr(v); if (t && t !== v) m.target.setAttribute(m.attributeName, t); }
       else m.addedNodes.forEach(walk);
     }
-  }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['placeholder', 'title', 'aria-label'] });
 }

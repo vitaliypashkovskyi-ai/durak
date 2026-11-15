@@ -1,4 +1,5 @@
 import { GAME_EXACT, GAME_RULES } from './i18n-en-games.js';
+import { GAME2_EXACT, GAME2_RULES } from './i18n-en-games2.js';
 // English for the interface (stage 1: menu, panels, rating, friends, clubs, quests, shop).
 // EN_EXACT — whole lines; EN_RULES — lines with numbers/names; EN_SUBS — small pieces inside other lines.
 export const EN_TITLES = {
@@ -17,6 +18,7 @@ const DAYS = { 'неділя': 'Sunday', 'понеділок': 'Monday', 'вів
 const game = s => { const m = s.match(/^(\S+)\s+(.+)$/); return m && GAME_UK[m[2]] ? m[1] + ' ' + GAME_UK[m[2]] : GAME_UK[s] || s; };
 
 export const EN_EXACT = {
+  ...GAME2_EXACT,
   ...GAME_EXACT,
   // game list
   ...GAME_UK,
@@ -152,7 +154,7 @@ export const EN_RULES = [
   [/^🔥 Серія бонусів: (\d+) дн\.(?: · сьогодні чекає \+(\d+))?$/, (x, d, b) => `🔥 Bonus streak: ${d} d.` + (b ? ` · today +${b} is waiting` : '')],
   [/^Досягнення: (\d+) з (\d+)$/, 'Achievements: $1 of $2'],
   [/^Досягнення \((\d+)\):$/, 'Achievements ($1):'],
-  [/^(.+) \((\d+)\/(\d+)\)$/, (x, t, a, b) => `${x(t)} (${a}/${b})`],
+  [/^(.+) \((\d+)\/(\d+)\)$/, (x, t, a, b) => (x(t) === t ? null : `${x(t)} (${a}/${b})`)],
   [/^(🥇|🥈|🥉|\d+\.) (.+) — (\d+) оч\.(?: · приз \+(\d+))?$/, (x, m, n, p, z) => `${m} ${n} — ${p} pts` + (z ? ` · prize +${z}` : '')],
   [/^(🥇|🥈|🥉|\d+\.) (.+) — (\d+) оч\. · 👥 (\d+)$/, '$1 $2 — $3 pts · 👥 $4'],
   [/^⏳ До кінця турніру: (?:(\d+) дн )?(\d+) год(?: (\d+) хв)?$/, (x, d, h, m) => `⏳ Tournament ends in: ${d ? d + ' d ' : ''}${h} h${m ? ' ' + m + ' min' : ''}`],
@@ -196,21 +198,21 @@ export const EN_RULES = [
   [/^Цього тижня: (\d+) оч\. · місце (\d+) з (\d+) · код (\w+)$/, 'This week: $1 pts · place $2 of $3 · code $4'],
   [/^Ви в клубі «(.+)» 🎉$/, 'You are in the club «$1» 🎉'],
   [/^Код кімнати: (\w+)$/, 'Room code: $1'],
-  [/^(.+) · до (\d+)$/, (x, d, n) => `${d.replace(/карт[иа]?/, 'cards')} · up to ${n}`],
+  [/^(\d+ карт[иа]?|2 × 36) · до (\d+)$/, (x, d, n) => `${d.replace(/карт[иа]?/, 'cards')} · up to ${n}`],
   [/^(Коротка|Повна) · (\d+) роздач$/, (x, k, n) => `${k === 'Коротка' ? 'Short' : 'Full'} · ${n} deals`],
   [/^(Легкий|Середній|Складний) · (\d+×\d+), (\d+) мін$/, (x, k, sz, n) => `${{ 'Легкий': 'Easy', 'Середній': 'Medium', 'Складний': 'Hard' }[k]} · ${sz}, ${n} mines`],
 ];
 // drop the placeholder rule (kept only to document the shape of that line; handled by EN_SUBS)
 EN_RULES.splice(EN_RULES.findIndex(r => r[1] === null), 1);
-EN_RULES.push(...GAME_RULES);
+EN_RULES.push(...GAME_RULES, ...GAME2_RULES);
 
 // pieces inside other lines (names, seats, friends)
 export const EN_SUBS = [
   [' (ви)', ' (you)'], [' (ведучий)', ' (host)'], [' · онлайн', ' · online'], [' · ігор разом: ', ' · games together: '],
   [' хв тому', ' min ago'], [' год тому', ' h ago'], [' дн тому', ' d ago'], [' · 🏆 чемпіон місяця', ' · 🏆 champion of the month'],
-  [/^Ви(?=[ ,·]|$)/, 'You'], [/(\d) с(?=$|[ .!·,)])/g, '$1 s'],
+  [/(^|— |, )Ви(?=[ ,·:]|$)/g, '$1You'], [/(^|, )ви(?=,|$)/g, '$1you'], [/(\d) с(?=$|[ .!·,)])/g, '$1 s'],
   [' оч.', ' pts'],
-  ...Object.entries({ 'Тарас': 'Taras', 'Оксана': 'Oksana', 'Марко': 'Marko', 'Соломія': 'Solomiia', 'Богдан': 'Bohdan', 'Ірина': 'Iryna', 'Остап': 'Ostap', 'Дарина': 'Daryna', 'Назар': 'Nazar', 'Леся': 'Lesia', 'Петро': 'Petro' }).map(([a, b]) => ['🤖 ' + a, '🤖 ' + b]), [' · у колоді ', ' · deck '], [' · роздача ', ' · deal '], [' · ніч ', ' · night '], [' · день ', ' · day '], ['Гість ', 'Guest '],
+  ...Object.entries({ 'Тарас': 'Taras', 'Оксана': 'Oksana', 'Марко': 'Marko', 'Соломія': 'Solomiia', 'Богдан': 'Bohdan', 'Ірина': 'Iryna', 'Остап': 'Ostap', 'Дарина': 'Daryna', 'Назар': 'Nazar', 'Леся': 'Lesia', 'Петро': 'Petro' }).map(([a, b]) => [new RegExp(`(^|[^А-Яа-яІіЇїЄєҐґ'ʼ])${a}(?![А-Яа-яІіЇїЄєҐґ])`, 'g'), `$1${b}`]),
   ...Object.entries(GAME_UK).sort((a, b) => b[0].length - a[0].length),
   ...Object.entries({ 'Новачок 🌱': 'Newbie 🌱', 'Аматор 🙂': 'Amateur 🙂', 'Досвідчений 💪': 'Experienced 💪', 'Майстер 🏅': 'Master 🏅', 'Легенда 👑': 'Legend 👑' }),
 ];

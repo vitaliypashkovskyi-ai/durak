@@ -78,6 +78,11 @@ export const GAME2_EXACT = {
   'Ваш партнер сидить навпроти. Масть треба підтримати; вальти й трефи — козирі. Віддавайте партнерові «товсті» карти, коли взятка його.': 'Your partner sits opposite. Follow suit; jacks and clubs are trumps. Give your partner the «fat» cards when the trick is theirs.',
   'Вночі мафія обирає жертву, лікар рятує, комісар перевіряє. Вдень обговорюйте в чаті й голосуйте, кого вигнати.': 'At night the mafia picks a victim, the doctor saves, the detective checks. In the day discuss in the chat and vote whom to throw out.',
   'Ставте питання про локацію іншим гравцям. Хто відповідає дивно — може бути шпигуном! Шпигун вгадує локацію зі списку.': 'Ask other players about the location. Whoever answers strangely may be the spy! The spy guesses the location from the list.',
+  // Minesweeper of the day, the chest
+  'Сапер дня': 'Minesweeper of the day', '💣 Сапер дня — одне поле для всіх': '💣 Minesweeper of the day — one field for everyone', '🏆 Таблиця дня': '🏆 Table of the day',
+  'Ще ніхто не пройшов — будьте першим!': 'Nobody has cleared it yet — be the first!', 'Ваша спроба сьогодні: міна 💥': 'Your attempt today: a mine 💥',
+  'Потрапити в таблицю можна, граючи в Telegram (@IgryUA_bot).': 'To get into the table, play in Telegram (@IgryUA_bot).', '▶ Зіграти ще раз (не в залік)': '▶ Play again (not counted)', '▶ Грати': '▶ Play',
+  'Сапер дня пройдено!': 'Minesweeper of the day cleared!', 'Сапер дня: у таблицю йде лише перша спроба. Завтра — нове поле!': 'Minesweeper of the day: only the first attempt counts. A new field tomorrow!',
   // svara
   'вибув': 'out', 'чекає свару': 'waiting for the svara', 'пас': 'pass', 'підтримав': 'called', 'чекає': 'checked', '⚔️ Свара': '⚔️ Svara', 'Чекати': 'Check',
   'Свара! Скоро перегравання…': 'Svara! A replay is coming…', 'Наступна роздача скоро…': 'Next deal soon…', 'У вас закінчились фішки — ви глядач': 'You are out of chips — now you watch',
@@ -124,6 +129,13 @@ export const GAME2_EXACT = {
 };
 
 export const GAME2_RULES = [
+  [/^Однакове поле 12×16 \(30 мін\) для всіх гравців\. У таблицю йде лише перша спроба, перемога — \+(\d+) очки\. Хто розмінує найшвидше\?$/, 'The same 12×16 field (30 mines) for every player. Only the first attempt counts, a win gives +$1 points. Who clears it fastest?'],
+  [/^Учора найшвидший: (.+) — (\d+:\d+)$/, 'Fastest yesterday: $1 — $2'],
+  [/^🏆 Таблиця дня · пройшли (\d+) з (\d+)$/, '🏆 Table of the day · cleared $1 of $2'],
+  [/^Ваш результат: (\d+:\d+) · місце (\d+)$/, 'Your result: $1 · place $2'],
+  [/^🏆 Ви (\d+)-й у таблиці дня! \+(\d+)$/, '🏆 You are #$1 in the table of the day! +$2'],
+  [/^\+(\d+) і 🧰 скриня \+(\d+)!$/, '+$1 and the 🧰 chest +$2!'],
+  [/^🧰 Скриня \+20: через (\d+) дн\. поспіль$/, '🧰 Chest +20: in $1 days in a row'],
   // svara
   [/^Ви забираєте банк: \+(\d+) 💰$/, 'You take the pot: +$1 💰'],
   [/^(.+) забирає банк (\d+)$/, '$1 takes the pot of $2'],

@@ -83,8 +83,10 @@ export default {
       if (!can.ok) return json(can);
       const r = await tg(env, 'sendMessage', {
         chat_id: String(body.to).slice(3), parse_mode: 'HTML',
-        text: `👋 <b>${esc(user.name)}</b> кличе вас у гру ${GAMES[game].icon} <b>${GAMES[game].title}</b>! Кімната ${code}.`,
-        reply_markup: { inline_keyboard: [[{ text: '▶ Приєднатися', url: joinUrl(code) }]] },
+        text: can.lang === 'en'
+          ? `👋 <b>${esc(user.name)}</b> invites you to play ${GAMES[game].icon} <b>${GAMES[game].en}</b>! Room ${code}.`
+          : `👋 <b>${esc(user.name)}</b> кличе вас у гру ${GAMES[game].icon} <b>${GAMES[game].title}</b>! Кімната ${code}.`,
+        reply_markup: { inline_keyboard: [[{ text: can.lang === 'en' ? '▶ Join' : '▶ Приєднатися', url: joinUrl(code) }]] },
       }).catch(() => ({ ok: false }));
       return json({ ok: !!r.ok, why: r.ok ? null : 'no pm' });
     }
@@ -106,7 +108,7 @@ export default {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);
       if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
-      const link = await invoiceLink(env, user, String(body.item || ''));
+      const link = await invoiceLink(env, user, String(body.item || ''), body.lang === 'en');
       return link ? json({ link }) : json({ error: 'no item' }, 400);
     }
     if (url.pathname === '/api/event' && req.method === 'POST') {
@@ -173,15 +175,24 @@ export default {
       const body = await req.json().catch(() => ({}));
       const user = await authenticate({ init: body.init }, env);
       if (!user || !user.id.startsWith('tg:')) return json({ error: 'not telegram' }, 401);
-      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref, pm: user.pm, src: body.src });
+      const r = await statsCall(env, '/hello', { id: user.id, name: user.name, ref: body.ref, pm: user.pm, src: body.src, lang: body.lang });
       if (r.inviter) {
         // tell the friend who invited (works if they have ever opened a chat with the bot)
-        ctx.waitUntil(tg(env, 'sendMessage', {
+        ctx.waitUntil(statsCall(env, '/lang', { id: r.inviter }).then(l => tg(env, 'sendMessage', {
           chat_id: r.inviter.slice(3), parse_mode: 'HTML',
-          text: `🎉 Ваш друг <b>${esc(user.name)}</b> прийшов за вашим запрошенням — вам <b>+${r.inviterBonus}</b> очок!`,
-        }).catch(() => {}));
+          text: l.lang === 'en'
+            ? `🎉 Your friend <b>${esc(user.name)}</b> came by your invitation — <b>+${r.inviterBonus}</b> points for you!`
+            : `🎉 Ваш друг <b>${esc(user.name)}</b> прийшов за вашим запрошенням — вам <b>+${r.inviterBonus}</b> очок!`,
+        })).catch(() => {}));
       }
       return json({ ok: r.ok, welcome: r.welcome, bonus: r.bonus, invitedBy: r.invitedBy });
+    }
+    if (url.pathname === '/api/challenge' && req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      const user = await authenticate({ init: body.init }, env);
+      // anyone may look at the table; only Telegram players get into it
+      const id = user && user.id.startsWith('tg:') ? user.id : null;
+      return json(await statsCall(env, '/challenge', { id, name: user && user.name, op: id && body.op === 'done' ? 'done' : 'get', won: !!body.won, secs: body.secs }));
     }
     if (url.pathname === '/api/daily' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));

@@ -155,7 +155,7 @@ const ownsLook = item => SHOPPED.vip || SHOPPED.owned.includes(item);
 async function buy(item) {
   if (!signedIn) return toast('Покупки — у Telegram (@IgryUA_bot)');
   try {
-    const r = await (await fetch(`${httpBase()}/api/shop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), item }) })).json();
+    const r = await (await fetch(`${httpBase()}/api/shop`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), item, lang: LANG }) })).json();
     if (!r.link) return toast('Магазин зараз недоступний');
     if (!inTelegram || !tg.openInvoice) { window.open(r.link, '_blank'); return toast('Оплата відкриється в Telegram'); }
     tg.openInvoice(r.link, status => {
@@ -320,6 +320,11 @@ function showHub() {
   inviteBtn.textContent = '👥 Запросити друзів · +15 за кожного';
   inviteBtn.onclick = showInviteFriends;
   top.appendChild(inviteBtn);
+  const chBtn = document.createElement('button');
+  chBtn.className = 'hubact' + (pref('chDay', 0) === kyivDayNum() ? '' : ' gift');
+  chBtn.textContent = '💣 Сапер дня — одне поле для всіх';
+  chBtn.onclick = () => showChallenge();
+  top.appendChild(chBtn);
   if (signedIn) {
     const rowF = document.createElement('div');
     rowF.className = 'hubrow';
@@ -615,7 +620,10 @@ function showResult(v) {
       fetch(`${httpBase()}/api/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t: 'bot', game, res: r.res, init: signedIn ? AUTH() : '' }) })
         .then(x => x.json()).then(x => questToasts(x.done)).catch(() => {});
     }
-    buttons.push({ text: 'Ще раз', fn: () => startLocal(game, cfg, n) });
+    if (cfg && cfg.daily) {
+      if (!S.chSent) { S.chSent = true; sendChallenge(v); }
+      buttons.push({ text: '🏆 Таблиця дня', fn: () => showChallenge() });
+    } else buttons.push({ text: 'Ще раз', fn: () => startLocal(game, cfg, n) });
   } else {
     const me = v.seat, mine = v.again && v.again[me];
     const others = (v.again || []).filter((a, i) => a && i !== me).length;
@@ -634,6 +642,43 @@ const genCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), b =>
 const serverBase = () => new URLSearchParams(location.search).get('server') || SERVER;
 const httpBase = () => serverBase().replace(/^ws/, 'http');
 
+// ---------- «Сапер дня»: one field for everyone; the first attempt goes into the day's table ----------
+// the Kyiv day as a number, the same as the server's kyivDay()
+function kyivDayNum() { const s = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Kyiv' }); return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000); }
+const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+async function showChallenge() {
+  showPanel({ kind: 'challenge', icon: '💣', title: 'Сапер дня', text: 'Завантаження…', buttons: [{ text: 'Закрити', sec: true, fn: hidePanel }] });
+  let r = null;
+  try { r = await post('/api/challenge', { op: 'get' }); } catch (e) {}
+  if (panelKind() !== 'challenge') return;
+  const day = r && r.day ? r.day : kyivDayNum();
+  const played = pref('chDay', 0) === day || !!(r && r.me);
+  const body = document.createElement('div');
+  const p = document.createElement('p'); p.className = 'muted';
+  p.textContent = `Однакове поле 12×16 (30 мін) для всіх гравців. У таблицю йде лише перша спроба, перемога — +${r ? r.prize : 3} очки. Хто розмінує найшвидше?`;
+  body.appendChild(p);
+  if (r && r.yesterday) { const y = document.createElement('div'); y.className = 'lbl'; y.textContent = `Учора найшвидший: ${r.yesterday.name} — ${mmss(r.yesterday.secs)}`; body.appendChild(y); }
+  const l = document.createElement('div'); l.className = 'lbl'; l.textContent = r ? `🏆 Таблиця дня · пройшли ${r.winners} з ${r.tries}` : '🏆 Таблиця дня'; body.appendChild(l);
+  const ol = document.createElement('ol'); ol.className = 'plist top';
+  if (!r || !r.top.length) { const li = document.createElement('li'); li.className = 'free'; li.textContent = 'Ще ніхто не пройшов — будьте першим!'; ol.appendChild(li); }
+  else r.top.forEach((x, i) => { const li = document.createElement('li'); li.textContent = `${['🥇', '🥈', '🥉'][i] || (i + 1) + '.'} ${x.name} — ${mmss(x.secs)}`; ol.appendChild(li); });
+  body.appendChild(ol);
+  if (r && r.me) { const m = document.createElement('div'); m.className = 'lbl'; m.textContent = r.me.won ? `Ваш результат: ${mmss(r.me.secs)} · місце ${r.me.place}` : 'Ваша спроба сьогодні: міна 💥'; body.appendChild(m); }
+  if (!signedIn) { const m = document.createElement('p'); m.className = 'muted'; m.textContent = 'Потрапити в таблицю можна, граючи в Telegram (@IgryUA_bot).'; body.appendChild(m); }
+  const play = () => { setPref('chDay', day); startLocal('mines', { size: 'medium', daily: day }, 1); };
+  showPanel({ kind: 'challenge', icon: '💣', title: 'Сапер дня', body, buttons: [
+    { text: played ? '▶ Зіграти ще раз (не в залік)' : '▶ Грати', fn: play },
+    { text: 'Закрити', sec: true, fn: hidePanel }] });
+}
+async function sendChallenge(v) {
+  if (!signedIn || !v.daily || v.daily !== kyivDayNum()) return;
+  const secs = Math.round(((v.ended || Date.now()) - (v.started || Date.now())) / 1000);
+  try {
+    const r = await post('/api/challenge', { op: 'done', won: !!v.won, secs });
+    if (r && r.me && r.me.won && r.me.secs === secs) toast(`🏆 Ви ${r.me.place}-й у таблиці дня! +${r.prize}`);
+  } catch (e) {}
+}
+
 // ---------- daily bonus ----------
 async function claimDaily() {
   if (!signedIn) {
@@ -650,8 +695,9 @@ async function claimDaily() {
   const fire = '🔥'.repeat(Math.min(r.streak, 7));
   if (r.claimed) { sfx('win'); haptic('success'); setTimeout(() => questToasts(r.quests), 1800); }
   showPanel({
-    kind: 'daily', icon: r.claimed ? '🎁' : '⏳', title: r.claimed ? `+${r.bonus} очок!` : 'Сьогодні вже отримано',
+    kind: 'daily', icon: r.chest ? '🧰' : r.claimed ? '🎁' : '⏳', title: r.chest ? `+${r.bonus} і 🧰 скриня +${r.chest}!` : r.claimed ? `+${r.bonus} очок!` : 'Сьогодні вже отримано',
     text: `Серія: ${r.streak} ${r.streak === 1 ? 'день' : r.streak < 5 ? 'дні' : 'днів'} ${fire}\n` +
+      (r.chestIn ? `🧰 Скриня +20: через ${r.chestIn} дн. поспіль\n` : '') +
       `Завтра: +${r.next}${r.next < 7 ? ' (до +7 за тиждень поспіль)' : ''}\nУсього очок: ${r.points}`,
     buttons: [{ text: '🏆 Рейтинг', fn: () => showRating('week') }, { text: 'Закрити', sec: true, fn: hidePanel }],
   });
@@ -1133,7 +1179,7 @@ function showInviteFriends() {
 async function sayHello(ref, src) {
   if (!signedIn) return;
   try {
-    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), ref, src }) })).json();
+    const r = await (await fetch(`${httpBase()}/api/hello`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ init: AUTH(), ref, src, lang: LANG }) })).json();
     if (!r.welcome) return;
     sfx('win'); haptic('success');
     const show = () => showPanel({

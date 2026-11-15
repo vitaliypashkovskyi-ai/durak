@@ -11,15 +11,28 @@ export const SIZES = {
 export const sizeOf = cfg => (cfg && SIZES[cfg.size] ? cfg.size : 'easy');
 
 function rnd(n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+// a repeatable generator for the daily field (mulberry32)
+function seeded(seed) {
+  let t = seed >>> 0;
+  return n => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) % n; };
+}
 
 export function create(cfg, players) {
   const size = sizeOf(cfg), S = SIZES[size];
-  return {
-    game: 'mines', num: 1, size, w: S.w, h: S.h, mines: S.mines,
+  const G = {
+    game: 'mines', num: 1, size, w: S.w, h: S.h, mines: S.mines, daily: cfg && cfg.daily ? Number(cfg.daily) : 0,
     players: players.slice(0, 1).map(p => ({ name: p.name, bot: false })),
     mine: null, open: Array(S.w * S.h).fill(false), flag: Array(S.w * S.h).fill(false),
     started: 0, ended: 0, opened: 0, boom: -1, over: false, won: false, winner: null, ev: null,
   };
+  if (G.daily) {
+    // everyone gets the same mines and the same opened start in the middle; the clock starts with the first move
+    const start = ((G.h / 2) | 0) * G.w + ((G.w / 2) | 0);
+    plant(G, start, seeded(G.daily * 7919 + 13));
+    G.started = 0;
+    reveal(G, start);
+  }
+  return G;
 }
 export const neighbours = (G, i) => {
   const x = i % G.w, y = (i / G.w) | 0, out = [];
@@ -32,12 +45,12 @@ export const neighbours = (G, i) => {
 };
 const count = (G, i) => neighbours(G, i).filter(j => G.mine[j]).length;
 
-function plant(G, first) {
+function plant(G, first, rand = rnd) {
   const safe = new Set([first, ...neighbours(G, first)]);
   const cells = [];
   for (let i = 0; i < G.w * G.h; i++) if (!safe.has(i)) cells.push(i);
   G.mine = Array(G.w * G.h).fill(false);
-  for (let k = 0; k < G.mines && cells.length; k++) { const j = rnd(cells.length); G.mine[cells[j]] = true; cells.splice(j, 1); }
+  for (let k = 0; k < G.mines && cells.length; k++) { const j = rand(cells.length); G.mine[cells[j]] = true; cells.splice(j, 1); }
   G.started = Date.now();
 }
 // opens a cell; empty ones (0) open their neighbours too
@@ -63,11 +76,13 @@ export function act(G, seat, m) {
   if (m.t === 'flag') {
     if (G.open[i]) return false;
     G.flag[i] = !G.flag[i];
+    if (G.daily && !G.started) G.started = Date.now();
     G.ev = { kind: 'flag' };
     return true;
   }
   if (m.t !== 'open') return false;
   if (!G.mine) plant(G, i);
+  if (!G.started) G.started = Date.now();
   let ok = true;
   if (G.open[i]) {
     // an opened number with all its flags placed: open the other neighbours
@@ -88,7 +103,7 @@ export function advance() {}
 export function view(G, seat) {
   return {
     game: 'mines', seat, num: G.num, over: G.over, won: G.won, winner: G.winner, ev: G.ev, turn: 0,
-    players: G.players, size: G.size, w: G.w, h: G.h, mines: G.mines, started: G.started, ended: G.ended,
+    players: G.players, size: G.size, w: G.w, h: G.h, mines: G.mines, started: G.started, ended: G.ended, daily: G.daily,
     flags: G.flag.filter(Boolean).length, boom: G.boom,
     // what the player can see: -1 hidden, -2 flag, -3 mine (after the end), 0..8 numbers
     cells: G.open.map((o, i) => (o ? (G.mine && G.mine[i] ? -3 : count(G, i)) : G.over && G.mine && G.mine[i] ? (G.flag[i] ? -2 : -3) : G.flag[i] ? -2 : -1)),

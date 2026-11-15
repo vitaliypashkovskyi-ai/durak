@@ -26,6 +26,12 @@ export const GAMES = {
   klondike: { icon: '🂠', title: 'Косинка' },
   chess: { icon: '♟', title: 'Шахи' },
 };
+const EN_TITLES = { durak: 'Durak', battle: 'Battleship', mafia: 'Mafia', thousand: 'Thousand', spy: 'Spy', goat: 'Kozel', rpoker: 'Painted Poker',
+  svara: 'Svara', checkers: 'Checkers', nardy: 'Long Backgammon', dice: 'Dice Poker', spider: 'Spider', mines: 'Minesweeper', bgammon: 'Backgammon',
+  pref: 'Preferans', quiz: 'Quiz', klondike: 'Klondike', chess: 'Chess' };
+for (const k in GAMES) GAMES[k].en = EN_TITLES[k] || GAMES[k].title;
+// Same rule as the game page: Ukrainian, Russian and Belarusian speakers get Ukrainian, everyone else English.
+export const isEn = from => !/^(uk|ru|be)/i.test((from && from.language_code) || 'uk');
 export const joinUrl = code => `https://t.me/${BOT}?startapp=${code}`;
 
 export async function tg(env, method, params) {
@@ -62,6 +68,25 @@ async function inlineQuery(q, env) {
     reply_markup: { inline_keyboard: [[{ text: button, url }]] },
   });
   const name = esc(q.from.first_name || 'Друг');
+  if (isEn(q.from)) {
+    const G = id => (GAMES[id] ? { icon: GAMES[id].icon, title: GAMES[id].en } : null);
+    if (words[0] === 'r' && /^[A-Z0-9]{4,8}$/.test(words[1] || '')) {
+      const g = G(words[2]) || { icon: '🎲', title: 'a game' };
+      card('room' + words[1], `${g.icon} Invite to ${g.title}`, `Room ${words[1]} — your friend joins your table at once`,
+        `🎲 <b>${name}</b> invites you to play ${g.icon} <b>${esc(g.title)}</b>!\nRoom ${words[1]} — tap the button and take a seat.`, '▶ Join', joinUrl(words[1] + ref));
+    } else if (words[0] === 'k' && /^[A-Z0-9]{5}$/.test(words[1] || '')) {
+      card('club' + words[1], '🏠 Invite to the club', `Club code ${words[1]}`,
+        `🏠 <b>${name}</b> invites you to their club in «Ігри UA»! We play together and compete with other clubs 🏆`, '🏠 Join the club', `https://t.me/${BOT}?startapp=club-${words[1]}`);
+    } else if (words[0] === 'w' && G(words[1])) {
+      const g = G(words[1]);
+      card('win' + words[1], '🏆 Show off the win', `${g.icon} ${g.title}`,
+        `🏆 <b>${name}</b> just won at ${g.icon} <b>${esc(g.title)}</b>!\nCan you do better? Play «Ігри UA» 🎲`, `${g.icon} Play`, `https://t.me/${BOT}?startapp=r${q.from.id}`);
+    }
+    card('invite', '🎲 Invite to «Ігри UA»', 'Durak, Poker, Chess, Backgammon and 14 more games — +5 bonus for your friend',
+      `🎲 <b>${name}</b> invites you to «Ігри UA»: Durak, Poker, Preferans, Chess, Backgammon, Mafia and 12 more games — right in Telegram!`,
+      '🎲 Play', `https://t.me/${BOT}?startapp=r${q.from.id}`);
+    return tg(env, 'answerInlineQuery', { inline_query_id: q.id, results, cache_time: 0, is_personal: true });
+  }
   if (words[0] === 'r' && /^[A-Z0-9]{4,8}$/.test(words[1] || '')) {
     const g = GAMES[words[2]] || { icon: '🎲', title: 'гру' };
     card('room' + words[1], `${g.icon} Запросити в ${g.title}`, `Кімната ${words[1]} — друг одразу сяде за ваш стіл`,
@@ -87,12 +112,13 @@ async function inlineQuery(q, env) {
 
 // ---------- Telegram Stars ----------
 // payload = "<item>:<telegram user id>"
-export async function invoiceLink(env, user, item) {
+export async function invoiceLink(env, user, item, en) {
   const it = SHOP[item];
   if (!it) return null;
+  const [title, desc] = en && it.en ? it.en : [it.title, it.desc];
   const r = await tg(env, 'createInvoiceLink', {
-    title: it.title, description: it.desc, payload: `${item}:${user.id.slice(3)}`,
-    provider_token: '', currency: 'XTR', prices: [{ label: it.title, amount: it.price }],
+    title, description: desc, payload: `${item}:${user.id.slice(3)}`,
+    provider_token: '', currency: 'XTR', prices: [{ label: title, amount: it.price }],
   });
   return r.ok ? r.result : null;
 }
@@ -100,14 +126,17 @@ async function preCheckout(q, env) {
   const [item, uid] = String(q.invoice_payload || '').split(':');
   const it = SHOP[item];
   const ok = !!it && q.currency === 'XTR' && q.total_amount === it.price && uid === String(q.from.id);
-  return tg(env, 'answerPreCheckoutQuery', { pre_checkout_query_id: q.id, ok, ...(ok ? {} : { error_message: 'Товар змінився — відкрийте магазин ще раз.' }) });
+  return tg(env, 'answerPreCheckoutQuery', { pre_checkout_query_id: q.id, ok, ...(ok ? {} : { error_message: isEn(q.from) ? 'The item has changed — open the shop again.' : 'Товар змінився — відкрийте магазин ще раз.' }) });
 }
 async function paid(msg, env) {
   const p = msg.successful_payment;
   const [item] = String(p.invoice_payload || '').split(':');
   const r = await statsCall(env, '/buy', { id: 'tg:' + msg.from.id, item, stars: p.total_amount, charge: p.telegram_payment_charge_id });
   const it = SHOP[item];
-  const text = item === 'vip'
+  const text = isEn(msg.from) ? (item === 'vip'
+    ? `💎 Thank you! VIP is active until <b>${new Date(r.vip_until || Date.now()).toLocaleDateString('en-GB', { timeZone: 'Europe/Kyiv' })}</b>: the 💎 badge next to your name and all premium looks.`
+    : `🎉 Thank you for the purchase! «${esc(it && it.en ? it.en[0] : item)}» is yours forever. Choose it in the game: 🎨 Looks.`)
+    : item === 'vip'
     ? `💎 Дякуємо! VIP діє до <b>${new Date(r.vip_until || Date.now()).toLocaleDateString('uk-UA', { timeZone: 'Europe/Kyiv' })}</b>: значок 💎 біля імені й усі преміум-оформлення.`
     : `🎉 Дякуємо за покупку! «${esc(it ? it.title : item)}» — ваше назавжди. Оберіть у грі: 🎨 Оформлення.`;
   return tg(env, 'sendMessage', { chat_id: msg.chat.id, parse_mode: 'HTML', text });
@@ -139,9 +168,13 @@ ${bots(a.bot7)}
 ⭐ <b>Stars</b>: сьогодні ${a.stars.today} · за тиждень ${a.stars.week} · усього ${a.stars.all} (покупців ${a.stars.buyers}, VIP зараз ${a.stars.vips})`;
 }
 
-export function topText(rows, title) {
-  if (!rows.length) return `${title}\n\nПоки що порожньо — зіграйте онлайн з друзями, щоб потрапити сюди!`;
+export function topText(rows, title, en) {
   const medal = i => ['🥇', '🥈', '🥉'][i] || `${i + 1}.`;
+  if (en) {
+    if (!rows.length) return `${title}\n\nEmpty so far — play online with friends to get here!`;
+    return `${title}\n\n` + rows.map((r, i) => `${medal(i)} ${esc(r.name)} — <b>${r.points}</b> pts (${r.wins} wins)`).join('\n');
+  }
+  if (!rows.length) return `${title}\n\nПоки що порожньо — зіграйте онлайн з друзями, щоб потрапити сюди!`;
   return `${title}\n\n` + rows.map((r, i) => `${medal(i)} ${esc(r.name)} — <b>${r.points}</b> оч. (${r.wins} перемог)`).join('\n');
 }
 
@@ -179,11 +212,23 @@ const menuKeyboard = withPlay => ({
     [{ text: '🎲 Короткі нарди', callback_data: 'new:bgammon' }, { text: '🏆 Топ тижня', callback_data: 'top' }],
   ],
 });
+const menuKeyboardEn = () => ({
+  inline_keyboard: [[{ text: '🎮 Open the games', web_app: { url: APP_URL } }],
+    ...[['durak', 'battle'], ['mafia', 'thousand'], ['spy', 'goat'], ['rpoker', 'svara'], ['checkers', 'nardy'], ['dice', 'chess'], ['quiz', 'pref']]
+      .map(row => row.map(id => ({ text: `${GAMES[id].icon} ${GAMES[id].en}`, callback_data: 'new:' + id }))),
+    [{ text: `${GAMES.bgammon.icon} ${GAMES.bgammon.en}`, callback_data: 'new:bgammon' }, { text: '🏆 Top of the week', callback_data: 'top' }]],
+});
+const MENU_TEXT_EN = '🎲 <b>Ігри UA</b> — pick a game and the bot gathers a room. Whoever taps «Join» sits at your table. Or open all 18 games with the button on top.';
 const MENU_TEXT = '🎲 <b>Ігри UA</b> — оберіть гру, і бот збере кімнату. Хто натисне «Приєднатися», зайде до вас.';
 
-async function gatherRoom(env, makeRoom, chatId, from, game) {
+async function gatherRoom(env, makeRoom, chatId, from, game, en) {
   const code = await makeRoom({ game });
   const g = GAMES[game], who = esc((from && from.first_name) || 'Хтось');
+  if (en) return tg(env, 'sendMessage', {
+    chat_id: chatId, parse_mode: 'HTML',
+    text: `${g.icon} <b>${who}</b> is gathering a game of «${g.en}»!\nTap the button to join 👇`,
+    reply_markup: { inline_keyboard: [[{ text: `▶ Join (${g.en})`, url: joinUrl(code) }]] },
+  });
   return tg(env, 'sendMessage', {
     chat_id: chatId, parse_mode: 'HTML',
     text: `${g.icon} <b>${who}</b> збирає гру «${g.title}»!\nНатисніть кнопку, щоб приєднатися 👇`,
@@ -200,17 +245,20 @@ export async function handleCallback(q, env, makeRoom) {
   if (q.data === 'notify:off' || q.data === 'notify:on') {
     const on = q.data === 'notify:on';
     await statsCall(env, '/notify', { id: 'tg:' + q.from.id, on });
-    return tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text: on ? '🔔 Нагадування увімкнено' : '🔕 Нагадування вимкнено. Увімкнути: /notify' });
+    const en = isEn(q.from);
+    return tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text: on ? (en ? '🔔 Reminders on' : '🔔 Нагадування увімкнено') : (en ? '🔕 Reminders off. Turn on: /notify' : '🔕 Нагадування вимкнено. Увімкнути: /notify') });
   }
   if (q.data === 'top') {
     await tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
     const rows = await statsCall(env, '/top?period=week');
-    return tg(env, 'sendMessage', { chat_id: chat.id, parse_mode: 'HTML', text: topText(rows, '🏆 <b>Топ гравців тижня</b>') });
+    const en = chat.type === 'private' && isEn(q.from);
+    return tg(env, 'sendMessage', { chat_id: chat.id, parse_mode: 'HTML', text: en ? topText(rows, '🏆 <b>Top players of the week</b>', true) : topText(rows, '🏆 <b>Топ гравців тижня</b>') });
   }
   const game = typeof q.data === 'string' && q.data.startsWith('new:') ? q.data.slice(4) : null;
   if (!GAMES[game]) return tg(env, 'answerCallbackQuery', { callback_query_id: q.id });
-  await tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text: `${GAMES[game].icon} Збираю кімнату…` });
-  return gatherRoom(env, makeRoom, chat.id, q.from, game);
+  const en = chat.type === 'private' && isEn(q.from);
+  await tg(env, 'answerCallbackQuery', { callback_query_id: q.id, text: `${GAMES[game].icon} ${en ? 'Gathering a room…' : 'Збираю кімнату…'}` });
+  return gatherRoom(env, makeRoom, chat.id, q.from, game, en);
 }
 
 async function handleCommand(msg, env, makeRoom) {
@@ -221,11 +269,12 @@ async function handleCommand(msg, env, makeRoom) {
   const chat = msg.chat;
   const reply = (text, extra = {}) => tg(env, 'sendMessage', { chat_id: chat.id, text, parse_mode: 'HTML', disable_web_page_preview: true, ...extra });
 
+  const priv = chat.type === 'private';
+  const en = priv && isEn(msg.from);          // groups stay Ukrainian: our community speaks it
   if (cmd === '/top') {
     const rows = await statsCall(env, '/top?period=week');
-    return reply(topText(rows, '🏆 <b>Топ гравців тижня</b>'));
+    return reply(en ? topText(rows, '🏆 <b>Top players of the week</b>', true) : topText(rows, '🏆 <b>Топ гравців тижня</b>'));
   }
-  const priv = chat.type === 'private';
   if (priv && cmd === '/stats') {
     // only for the admins of the news channel
     // ADMIN_TEST only in server/.dev.vars: no admin check, the text goes to the log
@@ -236,24 +285,28 @@ async function handleCommand(msg, env, makeRoom) {
     return reply(text, { reply_markup: { inline_keyboard: [[{ text: '📊 Відкрити панель з графіками', web_app: { url: APP_URL + 'admin/' } }]] } });
   }
   if (cmd === '/krokodyl' || cmd === '/croc' || cmd === '/krokodil') {
+    if (en) return reply('🐊 Krokodyl (a word-explaining game, in Ukrainian) is played in a group: add @IgryUA_bot to your chat as an admin and write /krokodyl — or play in our chat @ua_Igry.');
     if (priv) return reply('🐊 Крокодил грають у групі: додайте @IgryUA_bot у свій чат (адміністратором) і напишіть /krokodyl — або грайте в нашому чаті @ua_Igry.');
     return statsCall(env, '/croc', { kind: 'start', chat: chat.id, from: { id: msg.from.id, name: msg.from.first_name } });
   }
   if (priv && cmd === '/paysupport') {
+    if (en) return reply('💳 <b>Purchases for ⭐ Stars</b>\nStars buy only looks (card backs, tables) and the VIP badge — they never change the game.\nIf something is wrong with a purchase, write here or in the chat @ua_Igry with the word «payment» — we will sort it out.');
     return reply('💳 <b>Покупки за ⭐ Stars</b>\nЗа зірки продаються лише оформлення (сорочки карт, столи) і VIP-значок — на гру вони не впливають.\nЯкщо з покупкою щось не так — напишіть сюди або в чат @ua_Igry з позначкою «оплата», ми розберемося.');
   }
   if (priv && (cmd === '/stop' || cmd === '/notify')) {
     const on = cmd === '/notify';
-    await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, on, pm: true });
+    await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, on, pm: true, lang: en ? 'en' : 'uk' });
+    if (en) return reply(on ? '🔔 Reminders are on: the daily bonus and the weekly tournament. Turn off — /stop' : '🔕 Reminders are off. Turn on again — /notify');
     return reply(on ? '🔔 Нагадування увімкнено: бонус дня, турнір тижня. Вимкнути — /stop' : '🔕 Нагадування вимкнено. Увімкнути знову — /notify');
   }
   // someone who writes to the bot privately can get reminders
-  if (priv && msg.from) await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, pm: true, name: msg.from.first_name }).catch(() => {});
+  if (priv && msg.from) await statsCall(env, '/notify', { id: 'tg:' + msg.from.id, pm: true, name: msg.from.first_name, lang: en ? 'en' : 'uk' }).catch(() => {});
   if (['/start', '/play', '/help', '/igry', '/games', '/menu'].includes(cmd)) {
     // web_app buttons work only in private chats
+    if (en) return reply(MENU_TEXT_EN, { reply_markup: menuKeyboardEn() });
     return reply(MENU_TEXT, { reply_markup: menuKeyboard(priv) });
   }
   const game = GROUP_CMDS[cmd];
   if (!game) return;
-  return gatherRoom(env, makeRoom, chat.id, msg.from, game);
+  return gatherRoom(env, makeRoom, chat.id, msg.from, game, en);
 }

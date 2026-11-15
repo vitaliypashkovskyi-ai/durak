@@ -118,6 +118,8 @@ function kyivDay(ts = Date.now()) {
   return Math.round(Date.parse(s + 'T00:00:00Z') / 86400000);
 }
 const dailyBonus = streak => Math.min(streak, 7);
+const CHEST = 20;            // the 🧰 chest: every 7th day of the bonus streak
+const CHALLENGE_WIN = 3;     // «Сапер дня»: points for clearing today's field (first attempt only)
 
 const json = d => new Response(JSON.stringify(d), { headers: { 'Content-Type': 'application/json' } });
 
@@ -136,10 +138,12 @@ export class Stats {
     this.sql.exec('CREATE TABLE IF NOT EXISTS purchases(id TEXT, item TEXT, stars INTEGER, charge TEXT PRIMARY KEY, ts INTEGER)');
     // where a player came from (link label) and which days they opened the game
     if (!cols.includes('source')) this.sql.exec("ALTER TABLE players ADD COLUMN source TEXT DEFAULT ''");
+    if (!cols.includes('lang')) this.sql.exec("ALTER TABLE players ADD COLUMN lang TEXT DEFAULT ''");   // 'en' = the bot writes in English
     this.sql.exec('CREATE TABLE IF NOT EXISTS visits(id TEXT, day INTEGER, PRIMARY KEY(id, day))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS clubs(code TEXT PRIMARY KEY, name TEXT, owner TEXT, created INTEGER)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS club_members(id TEXT PRIMARY KEY, club TEXT, joined INTEGER)');
     this.sql.exec('CREATE TABLE IF NOT EXISTS friends(a TEXT, b TEXT, ts INTEGER, games INTEGER DEFAULT 0, PRIMARY KEY(a, b))');
+    this.sql.exec('CREATE TABLE IF NOT EXISTS challenge(day INTEGER, id TEXT, won INTEGER, secs INTEGER, ts INTEGER, PRIMARY KEY(day, id))');
     this.sql.exec('CREATE TABLE IF NOT EXISTS quests(id TEXT, day INTEGER, qi INTEGER, prog INTEGER DEFAULT 0, done INTEGER DEFAULT 0, PRIMARY KEY(id, day, qi))');
     this.invited = new Map();   // 'a>b' -> last invite time (anti-spam)
     this.seen = new Map();   // who has the app open now (in memory): id -> last ping
@@ -151,7 +155,7 @@ export class Stats {
     if (url.pathname === '/report') { this.report(body); return json({ ok: true }); }
     if (url.pathname === '/profile') return json(this.profile(body.id));
     if (url.pathname === '/daily') return json(this.daily(body.id, body.name));
-    if (url.pathname === '/hello') return json(this.hello(body.id, body.name, body.ref, body.pm, body.src));
+    if (url.pathname === '/hello') return json(this.hello(body.id, body.name, body.ref, body.pm, body.src, body.lang));
     if (url.pathname === '/top') return json(this.top(url.searchParams.get('period')));
     if (url.pathname === '/community') return json(await this.community());
     if (url.pathname === '/weekly') return json(await this.weekly());
@@ -163,7 +167,9 @@ export class Stats {
       return json({ ok: true, done });
     }
     if (url.pathname === '/friends') return json(this.friends(body.id));
-    if (url.pathname === '/invite') return json(this.canInvite(body.from, body.to));
+    if (url.pathname === '/invite') return json({ ...this.canInvite(body.from, body.to), lang: this.langOf(body.to) });
+    if (url.pathname === '/lang') return json({ lang: this.langOf(body.id) });
+    if (url.pathname === '/challenge') return json(this.challenge(body));
     if (url.pathname === '/quests') return json(this.quests(body.id));
     if (url.pathname === '/player') return json(this.player(body.pub, body.viewer));
     if (url.pathname === '/evening') return json(this.evening(body.id));
@@ -220,12 +226,15 @@ export class Stats {
 
   // First visit: +10 once. A brand-new player who came by a friend's link gets +5 more and the
   // friend +15 for every new player, without a daily cap.
-  hello(id, name, ref, pm, src) {
+  // the player's language for the bot's personal messages: '' (not known yet) and 'uk' both mean Ukrainian
+  langOf(id) { const r = this.sql.exec('SELECT lang FROM players WHERE id = ?', String(id)).toArray()[0]; return r && r.lang === 'en' ? 'en' : 'uk'; }
+  hello(id, name, ref, pm, src, lang) {
     if (!/^tg:\d+$/.test(String(id))) return { ok: false };
     const existed = this.sql.exec('SELECT welcome_done FROM players WHERE id = ?', id).toArray()[0];
     this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
     this.sql.exec('UPDATE players SET last_seen = ?, pm_ok = MAX(pm_ok, ?), first_seen = CASE WHEN first_seen = 0 THEN ? ELSE first_seen END WHERE id = ?', Date.now(), pm ? 1 : 0, Date.now(), id);
     this.sql.exec('INSERT INTO visits(id, day) VALUES(?, ?) ON CONFLICT DO NOTHING', id, kyivDay());
+    if (lang === 'en' || lang === 'uk') this.sql.exec('UPDATE players SET lang = ? WHERE id = ?', lang, id);   // the language the game is shown in
     if (!existed) {
       const source = /^[a-z0-9]{1,20}$/.test(String(src || '')) ? src : /^\d{3,15}$/.test(String(ref || '')) ? 'friend' : 'direct';
       this.sql.exec('UPDATE players SET source = ? WHERE id = ?', source, id);
@@ -257,13 +266,37 @@ export class Stats {
     this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name', id, String(name || '').slice(0, 24));
     const p = this.sql.exec('SELECT points, streak, best_streak, last_day FROM players WHERE id = ?', id).one();
     const today = kyivDay();
-    if (p.last_day === today) return { ok: true, claimed: false, streak: p.streak, next: dailyBonus(p.streak + 1), points: p.points };
+    if (p.last_day === today) return { ok: true, claimed: false, streak: p.streak, chestIn: 7 - (p.streak % 7), next: dailyBonus(p.streak + 1), points: p.points };
     const streak = p.last_day === today - 1 ? p.streak + 1 : 1;
+    const chest = streak % 7 === 0 ? CHEST : 0;
     const bonus = dailyBonus(streak);
     this.sql.exec('UPDATE players SET points = points + ?, streak = ?, best_streak = MAX(best_streak, ?), last_day = ? WHERE id = ?',
-      bonus, streak, streak, today, id);
+      bonus + chest, streak, streak, today, id);
     const quests = this.questEvent(id, { bonus: true });
-    return { ok: true, claimed: true, bonus, streak, next: dailyBonus(streak + 1), points: p.points + bonus, quests };
+    return { ok: true, claimed: true, bonus, chest, chestIn: 7 - (streak % 7), streak, next: dailyBonus(streak + 1), points: p.points + bonus + chest, quests };
+  }
+
+  // ---------- «Сапер дня»: one field for everyone (seeded by the Kyiv day); only the first attempt counts ----------
+  challenge({ id, name, op, won, secs }) {
+    const day = kyivDay();
+    if (op === 'done' && /^tg:\d+$/.test(String(id))) {
+      const t = Math.round(Number(secs));
+      const ok = Number.isFinite(t) && t >= 5 && t < 6 * 3600;
+      if (ok && !this.sql.exec('SELECT 1 FROM challenge WHERE day = ? AND id = ?', day, id).toArray().length) {
+        this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO NOTHING', id, String(name || 'Гравець').slice(0, 24));
+        this.sql.exec('INSERT INTO challenge(day, id, won, secs, ts) VALUES(?, ?, ?, ?, ?)', day, id, won ? 1 : 0, t, Date.now());
+        if (won) this.sql.exec('UPDATE players SET points = points + ? WHERE id = ?', CHALLENGE_WIN, id);
+      }
+    }
+    const rows = this.sql.exec(`SELECT c.id AS id, COALESCE(p.name, 'Гравець') AS name, c.secs AS secs FROM challenge c LEFT JOIN players p ON p.id = c.id
+      WHERE c.day = ? AND c.won = 1 ORDER BY c.secs, c.ts`, day).toArray();
+    const tries = this.sql.exec('SELECT COUNT(*) AS n FROM challenge WHERE day = ?', day).one().n;
+    const mine = /^tg:\d+$/.test(String(id)) ? this.sql.exec('SELECT won, secs FROM challenge WHERE day = ? AND id = ?', day, id).toArray()[0] : null;
+    const place = mine && mine.won ? rows.findIndex(r => r.id === id) + 1 : 0;
+    const y = this.sql.exec(`SELECT COALESCE(p.name, 'Гравець') AS name, c.secs AS secs FROM challenge c LEFT JOIN players p ON p.id = c.id
+      WHERE c.day = ? AND c.won = 1 ORDER BY c.secs, c.ts LIMIT 1`, day - 1).toArray()[0] || null;
+    return { day, size: 'medium', prize: CHALLENGE_WIN, top: rows.slice(0, 10).map(({ name, secs }) => ({ name, secs })), winners: rows.length, tries,
+      me: mine ? { won: !!mine.won, secs: mine.secs, place } : null, yesterday: y };
   }
 
   // ---------- counters per Kyiv day (kv 'c:<day>' = {key: n}) and the owner's summary ----------
@@ -340,7 +373,9 @@ export class Stats {
     const medal = ['🥇', '🥈', '🥉'];
     for (const w of winners) {
       await tg(this.env, 'sendMessage', { chat_id: w.id.slice(3), parse_mode: 'HTML',
-        text: `${medal[w.place - 1]} Сезон «${seasonName(s.key)}» завершено: ви на <b>${w.place} місці</b> (${w.points} оч.) — <b>+${w.prize}</b> очок!` +
+        text: this.langOf(w.id) === 'en'
+          ? `${medal[w.place - 1]} The season is over: you are <b>#${w.place}</b> (${w.points} pts) — <b>+${w.prize}</b> points!` + (w.place === 1 ? '\n🏆 You are the <b>Champion of the month</b>: a 🏆 will stand next to your name all next month.' : '')
+          : `${medal[w.place - 1]} Сезон «${seasonName(s.key)}» завершено: ви на <b>${w.place} місці</b> (${w.points} оч.) — <b>+${w.prize}</b> очок!` +
           (w.place === 1 ? `\n🏆 Ви — <b>Чемпіон ${seasonOf(s.key)}</b>: увесь наступний місяць біля вашого імені буде 🏆.` : '') }).catch(() => {});
     }
     const { channelId } = await this.community();
@@ -517,7 +552,9 @@ export class Stats {
     this.kvSet('evening_last', { day, winners: winners.map(({ name, points, place, prize }) => ({ name, points, place, prize })) });
     const medal = ['🥇', '🥈', '🥉'];
     for (const x of winners) await tg(this.env, 'sendMessage', { chat_id: x.id.slice(3), parse_mode: 'HTML',
-      text: `${medal[x.place - 1]} Вечірній турнір з Дурня: ви на <b>${x.place} місці</b> — <b>+${x.prize}</b> очок! Завтра о 20:00 — знову 🃏` }).catch(() => {});
+      text: this.langOf(x.id) === 'en'
+        ? `${medal[x.place - 1]} Evening Durak tournament: you are <b>#${x.place}</b> — <b>+${x.prize}</b> points! Tomorrow at 20:00 (Kyiv time) — again 🃏`
+        : `${medal[x.place - 1]} Вечірній турнір з Дурня: ви на <b>${x.place} місці</b> — <b>+${x.prize}</b> очок! Завтра о 20:00 — знову 🃏` }).catch(() => {});
     const { groupId } = await this.community();
     if (groupId) await tg(this.env, 'sendMessage', { chat_id: groupId, parse_mode: 'HTML',
       text: rows.length ? topText(rows, '🃏 <b>Підсумки вечірнього турніру з Дурня</b>') + `\n\n🎁 ${winners.map(x => `${medal[x.place - 1]} ${esc(x.name)} +${x.prize}`).join('  ')}\nЗавтра о 20:00 — новий турнір!`
@@ -636,11 +673,13 @@ export class Stats {
 
   // ---------- reminders ----------
   // {id, on?, pm?, name?}: on = reminders on/off, pm = the bot may write to this person
-  notify({ id, on, pm, name }) {
+  notify({ id, on, pm, name, lang }) {
     if (!/^tg:\d+$/.test(String(id))) return { ok: false };
     this.sql.exec('INSERT INTO players(id, name) VALUES(?, ?) ON CONFLICT(id) DO NOTHING', id, String(name || 'Гравець').slice(0, 24));
     if (on !== undefined) this.sql.exec('UPDATE players SET mute = ? WHERE id = ?', on ? 0 : 1, id);
     if (pm) this.sql.exec('UPDATE players SET pm_ok = 1 WHERE id = ?', id);
+    // from the bot chat: Telegram's language, but never over the choice made in the game
+    if (lang === 'en' || lang === 'uk') this.sql.exec("UPDATE players SET lang = ? WHERE id = ? AND lang = ''", lang, id);
     const p = this.sql.exec('SELECT mute, pm_ok FROM players WHERE id = ?', id).one();
     return { ok: true, on: !p.mute, pm: !!p.pm_ok };
   }
@@ -649,8 +688,9 @@ export class Stats {
     // REMIND_DAY_SHIFT only in server/.dev.vars: pretend it is a later day to test locally
     const now = Date.now(), today = kyivDay() + Number(this.env.REMIND_DAY_SHIFT || 0);
     const dow = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'Europe/Kyiv' })).getDay();   // 0 = Sunday
-    const rows = this.sql.exec(`SELECT id, name, points, streak, last_day, last_seen, reminded_day FROM players
-      WHERE pm_ok = 1 AND mute = 0 AND last_seen > ? AND reminded_day < ?`, now - WEEK, today).toArray();
+    // active in the last 8 days (the come-back nudge goes on days 3–7 of absence)
+    const rows = this.sql.exec(`SELECT id, name, points, streak, last_day, last_seen, reminded_day, lang FROM players
+      WHERE pm_ok = 1 AND mute = 0 AND last_seen > ? AND reminded_day < ?`, now - WEEK - 86400 * 1000, today).toArray();
     const tour = (dow === 6 || dow === 0) ? this.tourRows(1000) : [];
     const third = tour[2] ? tour[2].points : 0;
     let sent = 0;
@@ -660,18 +700,36 @@ export class Stats {
       const place = tour.findIndex(r => r.id === p.id) + 1;
       const streak = p.last_day === today - 1 ? p.streak : 0;
       const next = Math.min(7, (p.last_day === today - 1 ? p.streak : 0) + 1);
+      const en = p.lang === 'en', away = now - p.last_seen, chestToday = (streak + 1) % 7 === 0;
       let text = null;
-      if (place >= 4 && place <= 10 && third - tour[place - 1].points <= 9) {
-        text = `🏆 Ви на <b>${place}-му місці</b> в турнірі тижня — до призового місця лише <b>${third - tour[place - 1].points + 1}</b> оч.! Підсумки в неділю о 19:00 — встигніть зіграти 🎲`;
+      if (dow === 1 && kyivDay(p.last_seen) < today) {
+        // Monday: what the player did last week
+        const w = this.sql.exec(`SELECT COUNT(*) AS g, COALESCE(SUM(res = 'win'), 0) AS w, COALESCE(SUM(pts), 0) AS pts FROM results WHERE id = ? AND ts > ?`, p.id, now - WEEK).one();
+        if (w.g) text = en
+          ? `📅 <b>Your week in «Ігри UA»</b>: ${w.g} online games, ${w.w} wins, <b>+${w.pts}</b> points. A new weekly tournament is on — and 🎁 the daily bonus is waiting!`
+          : `📅 <b>Ваш тиждень в «Ігри UA»</b>: онлайн-ігор ${w.g}, перемог ${w.w}, <b>+${w.pts}</b> очок. Новий турнір тижня вже йде — і 🎁 бонус дня чекає!`;
+      }
+      if (text) { /* the Monday summary goes first */ }
+      else if (place >= 4 && place <= 10 && third - tour[place - 1].points <= 9) {
+        const need = third - tour[place - 1].points + 1;
+        text = en ? `🏆 You are <b>#${place}</b> in the weekly tournament — only <b>${need}</b> pts to a prize place! Results on Sunday at 19:00 (Kyiv) — play in time 🎲`
+          : `🏆 Ви на <b>${place}-му місці</b> в турнірі тижня — до призового місця лише <b>${need}</b> оч.! Підсумки в неділю о 19:00 — встигніть зіграти 🎲`;
       } else if (p.last_day < today && streak >= 2) {
-        text = `🔥 Ваша серія бонусів — <b>${streak} дн.</b> Не дайте їй згоріти: заберіть сьогоднішній бонус <b>+${next}</b> очок!`;
-      } else if (p.last_day < today && now - p.last_seen < 3 * 86400 * 1000) {
-        text = `🎁 Бонус дня чекає: <b>+${next}</b> очок. Зазирніть і заберіть — а заодно зіграйте партію 🃏`;
+        const chest = chestToday ? (en ? ` Today you also open the 🧰 chest: <b>+${CHEST}</b>!` : ` Сьогодні ще й відкриєте 🧰 скриню: <b>+${CHEST}</b>!`) : '';
+        text = (en ? `🔥 Your bonus streak is <b>${streak} days</b>. Don't let it burn out: claim today's bonus <b>+${next}</b> points!`
+          : `🔥 Ваша серія бонусів — <b>${streak} дн.</b> Не дайте їй згоріти: заберіть сьогоднішній бонус <b>+${next}</b> очок!`) + chest;
+      } else if (p.last_day < today && away < 3 * 86400 * 1000) {
+        text = en ? `🎁 The daily bonus is waiting: <b>+${next}</b> points. Drop in to claim it — and play a game 🃏`
+          : `🎁 Бонус дня чекає: <b>+${next}</b> очок. Зазирніть і заберіть — а заодно зіграйте партію 🃏`;
+      } else if (away >= 3 * 86400 * 1000 && p.reminded_day < kyivDay(p.last_seen) + 3) {
+        // once, after 3+ days away: what is new
+        text = en ? `👋 We miss you at the table! Today: 💣 <b>Minesweeper of the day</b> — one field for everyone, who is the fastest? And 🎁 the daily bonus.`
+          : `👋 Сумуємо без вас за столом! Сьогодні: 💣 <b>Сапер дня</b> — одне поле для всіх, хто найшвидший? І 🎁 бонус дня чекає.`;
       }
       if (!text) continue;
       const r = await tg(this.env, 'sendMessage', {
         chat_id: p.id.slice(3), parse_mode: 'HTML', text,
-        reply_markup: { inline_keyboard: [[{ text: '🎮 Грати', web_app: { url: APP_URL } }], [{ text: '🔕 Не нагадувати', callback_data: 'notify:off' }]] },
+        reply_markup: { inline_keyboard: [[{ text: en ? '🎮 Play' : '🎮 Грати', web_app: { url: APP_URL } }], [{ text: en ? '🔕 No reminders' : '🔕 Не нагадувати', callback_data: 'notify:off' }]] },
       }).catch(() => ({ ok: false }));
       sent++;
       if (r.ok) this.sql.exec('UPDATE players SET reminded_day = ? WHERE id = ?', today, p.id);
@@ -774,7 +832,9 @@ export class Stats {
     for (const w of winners) {
       await tg(this.env, 'sendMessage', {
         chat_id: w.id.slice(3), parse_mode: 'HTML',
-        text: `${medal[w.place - 1]} Вітаємо! Ви посіли <b>${w.place} місце</b> в турнірі тижня (${w.points} оч.) — вам <b>+${w.prize}</b> очок і кубок у профілі! Новий турнір уже почався 🎲`,
+        text: this.langOf(w.id) === 'en'
+          ? `${medal[w.place - 1]} Congratulations! You took <b>#${w.place}</b> in the weekly tournament (${w.points} pts) — <b>+${w.prize}</b> points and a cup in your profile! A new tournament has already started 🎲`
+          : `${medal[w.place - 1]} Вітаємо! Ви посіли <b>${w.place} місце</b> в турнірі тижня (${w.points} оч.) — вам <b>+${w.prize}</b> очок і кубок у профілі! Новий турнір уже почався 🎲`,
       }).catch(() => {});
     }
     if (!rows.length) return { posted: false };

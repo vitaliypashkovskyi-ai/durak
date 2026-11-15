@@ -24,7 +24,7 @@ export function render(v) {
   V = v;
   if (v.ev) {
     if (v.ev.kind === 'boom') { sfx('boom'); haptic('error'); }
-    else if (v.ev.kind === 'win') { sfx('win'); saveBest(v); }
+    else if (v.ev.kind === 'win') { sfx('win'); if (!v.daily) saveBest(v); }
     else if (v.ev.kind === 'flag') sfx('pop');
     else if (v.ev.kind === 'open') sfx('card');
   }
@@ -83,6 +83,9 @@ function draw() {
 export function result(v) {
   V = v;
   const t = secs(v), b = best(v.size);
+  if (v.daily) return v.won
+    ? { res: 'win', icon: '🏆', title: 'Сапер дня пройдено!', text: `⏱ ${t} с` }
+    : { res: 'lose', icon: '💥', title: 'Бум! Міна', text: 'Сапер дня: у таблицю йде лише перша спроба. Завтра — нове поле!' };
   return v.won
     ? { res: 'win', icon: '🏆', title: 'Поле розміновано!', text: `${E.SIZES[v.size].label} · ${t} с` + (b ? ` · рекорд ${b} с` : '') }
     : { res: 'lose', icon: '💥', title: 'Бум! Міна', text: `${E.SIZES[v.size].label} · ${t} с. Спробуйте ще!` };
